@@ -2,7 +2,9 @@
 
 `cat`, but written in Zig.
 
-A modern file viewer with TUI (Terminal User Interface) that automatically detects MIME types.
+A modern file reader that automatically detects MIME types.
+
+![Demo](./docs/demo.png)
 
 ## Table of Contents
 
