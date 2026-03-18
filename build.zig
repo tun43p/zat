@@ -10,7 +10,9 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/main.zig"),
             .target = target,
             .optimize = optimize,
-            .imports = &.{},
+            .imports = &.{
+                .{ .name = "mime", .module = b.dependency("mime", .{}).module("mime") },
+            },
         }),
     });
 
@@ -33,3 +35,26 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_exe_tests.step);
 }
+
+// const std = @import("std");
+
+// pub fn build(b: *std.Build) void {
+//     const target = b.standardTargetOptions(.{});
+
+//     const optimize = b.standardOptimizeOption(.{});
+// +    // 👇 de-reference termsize dep from build.zig.zon
+// +    const termsize = b.dependency("termsize", .{
+// +        .target = target,
+// +        .optimize = optimize,
+// +    }).module("termsize");
+//     var exe = b.addExecutable(.{
+//         .name = "your-exe",
+//         .root_source_file = .{ .path = "src/main.zig" },
+//         .target = target,
+//         .optimize = optimize,
+//     });
+// +    // 👇 add the termsize module to executable
+// +    exe.root_module.addImport("termsize", termsize);
+
+//     b.installArtifact(exe);
+// }
