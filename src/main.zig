@@ -1,27 +1,51 @@
 const std = @import("std");
-const zat = @import("zat");
 
 pub fn main() !void {
-    // Prints to stderr, ignoring potential errors.
-    std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
-    try zat.bufferedPrint();
+    const allocator = std.heap.page_allocator;
+
+    const file = try ZatFile.init(allocator, "LICENSE");
+    defer file.deinit(allocator);
+
+    std.debug.print("Path: {s}\n", .{file.path});
+    std.debug.print("Size: {}\n", .{file.size});
+    std.debug.print("Line count: {}\n", .{file.line_count});
+
+    for (file.content) |byte| {
+        std.debug.print("{c}", .{byte});
+    }
 }
 
-test "simple test" {
-    const gpa = std.testing.allocator;
-    var list: std.ArrayList(i32) = .empty;
-    defer list.deinit(gpa); // Try commenting this out and see if zig detects the memory leak!
-    try list.append(gpa, 42);
-    try std.testing.expectEqual(@as(i32, 42), list.pop());
-}
+const ZatFile = struct {
+    path: []const u8,
+    size: u64,
+    line_count: usize,
+    content: []const u8,
 
-test "fuzz example" {
-    const Context = struct {
-        fn testOne(context: @This(), input: []const u8) anyerror!void {
-            _ = context;
-            // Try passing `--fuzz` to `zig build test` and see if it manages to fail this test case!
-            try std.testing.expect(!std.mem.eql(u8, "canyoufindme", input));
+    pub fn init(allocator: std.mem.Allocator, path: []const u8) !ZatFile {
+        const file = try std.fs.cwd().openFile(path, .{});
+        defer file.close();
+
+        const file_size = try file.getEndPos();
+        const buffer = try allocator.alloc(u8, file_size);
+
+        _ = try file.readAll(buffer);
+
+        var line_count: usize = 0;
+        var it = std.mem.splitScalar(u8, buffer, '\n');
+        while (it.next()) |line| {
+            _ = line;
+            line_count += 1;
         }
-    };
-    try std.testing.fuzz(Context{}, Context.testOne, .{});
-}
+
+        return ZatFile{
+            .path = path,
+            .size = file_size,
+            .line_count = line_count,
+            .content = buffer,
+        };
+    }
+
+    pub fn deinit(self: ZatFile, allocator: std.mem.Allocator) void {
+        allocator.free(self.content);
+    }
+};
