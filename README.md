@@ -4,7 +4,7 @@
 
 A modern file reader that automatically detects MIME types.
 
-![Demo](./docs/demo.png)
+![Example](./docs/example.png)
 
 ## Table of Contents
 
