@@ -2,7 +2,7 @@ const std = @import("std");
 const mime = @import("mime");
 
 const logger = @import("logger.zig").Logger;
-const term_size = @import("size.zig").TermSize;
+const size = @import("size.zig").Size;
 
 const chars = logger.chars;
 const style = logger.style;
@@ -52,12 +52,12 @@ pub const ZatFile = struct {
     }
 
     pub fn print(self: ZatFile) !void {
-        const size = term_size.get(std.fs.File.stdout()) catch |err| {
+        const term_size = size.get(std.fs.File.stdout()) catch |err| {
             std.debug.print("Error getting terminal size: {s}\n", .{@errorName(err)});
             return err;
         };
 
-        if (size == null) return error.TerminalSizeNotFound;
+        if (term_size == null) return error.TerminalSizeNotFound;
 
         logger.print_pipe(style.red, 5, 1);
         logger.print(style.cyan, style.bold, "{s}", .{self.name});
@@ -65,7 +65,7 @@ pub const ZatFile = struct {
         logger.print(style.magenta, style.italic, "{s}", .{self.path});
         logger.print(style.reset, null, "\n", .{});
 
-        for (0..size.?.width) |_| {
+        for (0..term_size.?.width) |_| {
             logger.print_row(style.red);
         }
 

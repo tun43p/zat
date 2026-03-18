@@ -1,11 +1,11 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-pub const TermSize = struct {
+pub const Size = struct {
     width: u16,
     height: u16,
 
-    pub fn get(file: std.fs.File) !?TermSize {
+    pub fn get(file: std.fs.File) !?Size {
         if (!file.supportsAnsiEscapeCodes()) {
             return null;
         }
@@ -17,7 +17,7 @@ pub const TermSize = struct {
                     file.handle,
                     &buf,
                 )) {
-                    std.os.windows.TRUE => TermSize{
+                    std.os.windows.TRUE => Size{
                         .width = @intCast(buf.srWindow.Right - buf.srWindow.Left + 1),
                         .height = @intCast(buf.srWindow.Bottom - buf.srWindow.Top + 1),
                     },
@@ -33,7 +33,7 @@ pub const TermSize = struct {
                         @intFromPtr(&buf),
                     ),
                 )) {
-                    std.posix.E.SUCCESS => TermSize{
+                    std.posix.E.SUCCESS => Size{
                         .width = buf.col,
                         .height = buf.row,
                     },
@@ -46,5 +46,5 @@ pub const TermSize = struct {
 };
 
 test "get" {
-    std.debug.print("termsize {any}", .{TermSize.get(std.io.getStdOut())});
+    std.debug.print("termsize {any}", .{Size.get(std.io.getStdOut())});
 }
