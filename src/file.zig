@@ -20,7 +20,10 @@ pub const File = struct {
         const file_path = try std.fs.cwd().realpathAlloc(allocator, path);
         const file_name = std.fs.path.basename(file_path);
         const file_ext = std.fs.path.extension(file_path);
-        const mime_info = mime.fromExtension(file_ext);
+        const mime_info = if (file_ext.len == 0)
+            mime.fromFilename(file_name) orelse mime.fromExtension(file_ext)
+        else
+            mime.fromExtension(file_ext);
 
         const max_file_size = 50 * 1024 * 1024; // 50 MB
         if (file_size > max_file_size) return error.FileTooLarge;

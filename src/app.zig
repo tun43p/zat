@@ -47,6 +47,15 @@ pub const App = struct {
         while (true) {
             const c = self.term.readKey() orelse break;
 
+            if (self.term.checkResized()) {
+                if (TerminalSize.get(self.term.stdout) catch null) |new_size| {
+                    self.renderer.width = new_size.width;
+                    self.renderer.height = new_size.height;
+                    self.visible_lines = if (new_size.height > 6) new_size.height - 6 else 1;
+                    try self.render();
+                }
+            }
+
             const should_quit = switch (self.mode) {
                 .normal => try self.handleNormalMode(c),
                 .command => try self.handleCommandMode(c),
@@ -65,6 +74,30 @@ pub const App = struct {
             },
             'k' => {
                 if (self.scroll > 0) self.scroll -= 1;
+                try self.render();
+            },
+            'g' => {
+                self.scroll = 0;
+                try self.render();
+            },
+            'G' => {
+                self.scroll = if (self.lines.len > self.visible_lines) self.lines.len - self.visible_lines else 0;
+                try self.render();
+            },
+            'd' => {
+                const half = self.visible_lines / 2;
+                const max_scroll = if (self.lines.len > self.visible_lines) self.lines.len - self.visible_lines else 0;
+                self.scroll = @min(self.scroll + half, max_scroll);
+                try self.render();
+            },
+            'u' => {
+                const half = self.visible_lines / 2;
+                self.scroll = if (self.scroll > half) self.scroll - half else 0;
+                try self.render();
+            },
+            ' ' => {
+                const max_scroll = if (self.lines.len > self.visible_lines) self.lines.len - self.visible_lines else 0;
+                self.scroll = @min(self.scroll + self.visible_lines, max_scroll);
                 try self.render();
             },
             'n' => {
@@ -144,7 +177,15 @@ pub const App = struct {
                 if (std.mem.eql(u8, cmd, "q")) {
                     return true;
                 } else if (std.mem.eql(u8, cmd, "help")) {
-                    self.message = ":q quit | :help this message | j/k scroll | / search | n/N next/prev match";
+                    self.message = "j/k scroll | g/G top/bottom | d/u half page | space pgdn | /search | n/N match | :q :N :help";
+                } else if (self.parseGotoLine(cmd)) |line_num| {
+                    if (line_num > 0 and line_num <= self.lines.len) {
+                        const target = line_num - 1;
+                        const max_scroll = if (self.lines.len > self.visible_lines) self.lines.len - self.visible_lines else 0;
+                        self.scroll = @min(target, max_scroll);
+                    } else {
+                        self.message = "Invalid line number.";
+                    }
                 } else {
                     self.message = "Unknown command. Type :help for available commands.";
                 }
@@ -193,6 +234,11 @@ pub const App = struct {
             },
         }
         return false;
+    }
+
+    fn parseGotoLine(_: *App, cmd: []const u8) ?usize {
+        if (cmd.len == 0) return null;
+        return std.fmt.parseInt(usize, cmd, 10) catch null;
     }
 
     fn render(self: *App) !void {
