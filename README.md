@@ -1,6 +1,6 @@
 # Zat
 
-`cat`, but written in Zig.
+What `cat` would be if it went to the gym, thanks to Zig.
 
 A modern file reader that automatically detects MIME types.
 
@@ -12,10 +12,13 @@ A modern file reader that automatically detects MIME types.
   - [Table of Contents](#table-of-contents)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
-  - [Building](#building)
-    - [Build the project](#build-the-project)
-    - [Build in optimized mode](#build-in-optimized-mode)
+    - [Using Homebrew](#using-homebrew)
+    - [From Source](#from-source)
+      - [Download](#download)
+      - [Build the project](#build-the-project)
+      - [Build in optimized mode](#build-in-optimized-mode)
   - [Usage](#usage)
+    - [Basic Usage](#basic-usage)
     - [Run directly with zig build](#run-directly-with-zig-build)
     - [Run the compiled executable](#run-the-compiled-executable)
     - [Install globally (optional)](#install-globally-optional)
@@ -34,6 +37,16 @@ A modern file reader that automatically detects MIME types.
 
 ## Installation
 
+### Using Homebrew
+
+```bash
+brew install tun43p/tap/zat
+```
+
+### From Source
+
+#### Download
+
 Clone the repository:
 
 ```bash
@@ -41,9 +54,7 @@ git clone https://github.com/tun43p/zat.git
 cd zat
 ```
 
-## Building
-
-### Build the project
+#### Build the project
 
 ```bash
 zig build
@@ -51,7 +62,7 @@ zig build
 
 The executable will be generated in `zig-out/bin/zat`.
 
-### Build in optimized mode
+#### Build in optimized mode
 
 For an optimized (release) version:
 
@@ -67,6 +78,12 @@ Available optimization options:
 - `ReleaseSmall` - Optimized for size
 
 ## Usage
+
+### Basic Usage
+
+```bash
+zat [file]
+```
 
 ### Run directly with zig build
 
