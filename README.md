@@ -23,7 +23,6 @@ A modern file reader that automatically detects MIME types.
     - [Run the compiled executable](#run-the-compiled-executable)
     - [Install globally (optional)](#install-globally-optional)
   - [Available Commands](#available-commands)
-  - [Project Structure](#project-structure)
   - [Dependencies](#dependencies)
   - [Testing](#testing)
   - [Authors](#authors)
@@ -125,21 +124,6 @@ Then add `~/.local/bin` to your PATH if not already done.
 - `zig build run -- [args]` - Build and run the project with arguments
 - `zig build test` - Run tests
 - `zig build -Doptimize=ReleaseFast` - Build in optimized release mode
-
-## Project Structure
-
-```text
-zat/
-├── build.zig          # Zig build configuration
-├── build.zig.zon      # Dependency manager
-├── src/
-│   ├── main.zig       # Application entry point
-│   ├── file.zig       # File handling (ZatFile)
-│   ├── tui.zig        # Terminal user interface (Tui)
-│   └── size.zig       # Size utilities
-├── LICENSE            # MIT License
-└── README.md          # This file
-```
 
 ## Dependencies
 
