@@ -50,11 +50,6 @@ pub const Renderer = struct {
         try self.stdout.writeAll(file.name);
         try self.stdout.writeAll(style.reset);
 
-        // File path
-        try self.stdout.writeAll(table_color ++ " " ++ chars.pipe ++ " ");
-        try self.stdout.writeAll(table_color);
-        try self.stdout.writeAll(file.path);
-
         // File mime
         try self.stdout.writeAll(table_color ++ " " ++ chars.pipe ++ " ");
         try self.stdout.writeAll(style.bright_blue);
