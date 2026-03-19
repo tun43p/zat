@@ -189,3 +189,33 @@ pub fn fromExtension(ext: []const u8) MimeInfo {
 
     return .{ .mime = "text/plain", .readable = true };
 }
+
+test "fromExtension returns correct MIME for known extensions" {
+    const zig = fromExtension(".zig");
+    try std.testing.expectEqualStrings("text/x-zig", zig.mime);
+    try std.testing.expect(zig.readable);
+
+    const html = fromExtension(".html");
+    try std.testing.expectEqualStrings("text/html", html.mime);
+    try std.testing.expect(html.readable);
+
+    const py = fromExtension(".py");
+    try std.testing.expectEqualStrings("text/x-python", py.mime);
+    try std.testing.expect(py.readable);
+}
+
+test "fromExtension returns non-readable for binary files" {
+    const png = fromExtension(".png");
+    try std.testing.expectEqualStrings("image/png", png.mime);
+    try std.testing.expect(!png.readable);
+
+    const wasm = fromExtension(".wasm");
+    try std.testing.expectEqualStrings("application/wasm", wasm.mime);
+    try std.testing.expect(!wasm.readable);
+}
+
+test "fromExtension returns text/plain for unknown extensions" {
+    const unknown = fromExtension(".xyz_unknown");
+    try std.testing.expectEqualStrings("text/plain", unknown.mime);
+    try std.testing.expect(unknown.readable);
+}

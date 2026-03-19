@@ -253,3 +253,35 @@ const markdown_def = SyntaxDef{
         .{ .prefix = "```", .color = "\x1b[32m" }, // code block: green
     },
 };
+
+test "fromMime returns SyntaxDef for known MIME types" {
+    const zig_syn = fromMime("text/x-zig");
+    try std.testing.expect(zig_syn != null);
+    try std.testing.expectEqualStrings("//", zig_syn.?.line_comment);
+
+    const py_syn = fromMime("text/x-python");
+    try std.testing.expect(py_syn != null);
+    try std.testing.expectEqualStrings("#", py_syn.?.line_comment);
+
+    const md_syn = fromMime("text/markdown");
+    try std.testing.expect(md_syn != null);
+}
+
+test "fromMime returns null for unknown MIME types" {
+    try std.testing.expect(fromMime("application/octet-stream") == null);
+    try std.testing.expect(fromMime("image/png") == null);
+}
+
+test "CSS, HTML, and OCaml have empty line_comment" {
+    const css_syn = fromMime("text/css");
+    try std.testing.expect(css_syn != null);
+    try std.testing.expectEqualStrings("", css_syn.?.line_comment);
+
+    const html_syn = fromMime("text/html");
+    try std.testing.expect(html_syn != null);
+    try std.testing.expectEqualStrings("", html_syn.?.line_comment);
+
+    const ocaml_syn = fromMime("text/x-ocaml");
+    try std.testing.expect(ocaml_syn != null);
+    try std.testing.expectEqualStrings("", ocaml_syn.?.line_comment);
+}

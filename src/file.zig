@@ -59,3 +59,9 @@ pub const File = struct {
         };
     }
 };
+
+test "File.init returns error for non-existent file" {
+    const allocator = std.testing.allocator;
+    const result = File.init(allocator, "/tmp/zat_nonexistent_test_file_12345.txt");
+    try std.testing.expectError(error.FileNotFound, result);
+}
