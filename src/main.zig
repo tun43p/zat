@@ -45,7 +45,7 @@ pub fn main() !void {
     // Setup renderer
     const term_size = try TerminalSize.get(term.stdout) orelse return error.TerminalSizeNotFound;
     const visible_lines: usize = term_size.height - 6; // top + header + sep + footer sep + footer + bottom
-    const renderer = Renderer.init(term.stdout, term_size.width, term_size.height);
+    const renderer = Renderer.init(term.stdout, term_size.width, term_size.height, file.mime);
 
     // State
     var scroll: usize = 0;
