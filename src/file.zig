@@ -21,7 +21,14 @@ pub const ZatFile = struct {
 
         const file_ext = std.fs.path.extension(file_path);
         const mime_type = mime.extension_map.get(file_ext) orelse mime.Type.@"text/plain";
-        const mime_type_str = @tagName(mime_type);
+        var mime_type_str = @tagName(mime_type);
+
+        // TODO: Add more file types
+        if (std.mem.eql(u8, mime_type_str, "text/plain") and std.mem.eql(u8, file_ext, ".md")) {
+            mime_type_str = "text/markdown";
+        } else if (std.mem.eql(u8, mime_type_str, "text/plain") and std.mem.eql(u8, file_ext, ".zig")) {
+            mime_type_str = "text/zig";
+        }
 
         const buffer = try allocator.alloc(u8, file_size);
 
