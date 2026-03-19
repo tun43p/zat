@@ -1,7 +1,7 @@
 const std = @import("std");
 const mime = @import("mime");
 
-pub const ZatFile = struct {
+pub const File = struct {
     path: []const u8,
     name: []const u8,
     encoding: []const u8,
@@ -10,7 +10,7 @@ pub const ZatFile = struct {
     line_count: usize,
     content: []const u8,
 
-    pub fn init(allocator: std.mem.Allocator, path: []const u8) !ZatFile {
+    pub fn init(allocator: std.mem.Allocator, path: []const u8) !File {
         const file = try std.fs.cwd().openFile(path, .{});
         defer file.close();
 
@@ -41,7 +41,7 @@ pub const ZatFile = struct {
             line_count += 1;
         }
 
-        return ZatFile{
+        return File{
             .path = file_path,
             .name = file_name,
             .encoding = "UTF-8", // TODO: Detect encoding
@@ -52,7 +52,7 @@ pub const ZatFile = struct {
         };
     }
 
-    pub fn deinit(self: ZatFile, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: File, allocator: std.mem.Allocator) void {
         allocator.free(self.content);
     }
 };
