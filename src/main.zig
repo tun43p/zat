@@ -145,7 +145,7 @@ pub fn main() !void {
                         if (std.mem.eql(u8, cmd, "q")) {
                             break;
                         } else if (std.mem.eql(u8, cmd, "help")) {
-                            message = "Commands: :q quit | :help this message | j/k or arrows to scroll";
+                            message = ":q quit | :help this message | j/k scroll | / search | n/N next/prev match";
                         } else {
                             message = "Unknown command. Type :help for available commands.";
                         }

@@ -4,7 +4,7 @@ What `cat` would be if it went to the gym, thanks to Zig.
 
 A modern file reader that automatically detects MIME types.
 
-![Example](./docs/example.png)
+![Zat](./docs/zat.png)
 
 ## Table of Contents
 
@@ -22,7 +22,11 @@ A modern file reader that automatically detects MIME types.
     - [Run directly with zig build](#run-directly-with-zig-build)
     - [Run the compiled executable](#run-the-compiled-executable)
     - [Install globally (optional)](#install-globally-optional)
-  - [Available Commands](#available-commands)
+  - [Keyboard Shortcuts](#keyboard-shortcuts)
+    - [Navigation](#navigation)
+    - [Command Mode](#command-mode)
+    - [Search Mode](#search-mode)
+  - [Build Commands](#build-commands)
   - [Dependencies](#dependencies)
   - [Testing](#testing)
   - [Authors](#authors)
@@ -118,10 +122,41 @@ zig build install --prefix ~/.local
 
 Then add `~/.local/bin` to your PATH if not already done.
 
-## Available Commands
+## Keyboard Shortcuts
+
+### Navigation
+
+| Key                | Action      |
+| ------------------ | ----------- |
+| `j` / `Arrow Down` | Scroll down |
+| `k` / `Arrow Up`   | Scroll up   |
+
+### Command Mode
+
+| Key   | Action             |
+| ----- | ------------------ |
+| `:`   | Enter command mode |
+| `Esc` | Exit command mode  |
+
+| Command | Action                  |
+| ------- | ----------------------- |
+| `:q`    | Quit                    |
+| `:help` | Show available commands |
+
+### Search Mode
+
+| Key     | Action                               |
+| ------- | ------------------------------------ |
+| `/`     | Enter search mode                    |
+| `Enter` | Confirm search                       |
+| `Esc`   | Cancel search / Clear search results |
+| `n`     | Jump to next match                   |
+| `N`     | Jump to previous match               |
+
+## Build Commands
 
 - `zig build` - Build the project
-- `zig build run -- [args]` - Build and run the project with arguments
+- `zig build run -- [file]` - Build and run the project with arguments
 - `zig build test` - Run tests
 - `zig build -Doptimize=ReleaseFast` - Build in optimized release mode
 

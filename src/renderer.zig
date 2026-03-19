@@ -147,7 +147,7 @@ pub const Renderer = struct {
             try self.stdout.writeAll(style.reset);
             try self.stdout.writeAll(style.gray ++ " (press Esc to clear, n/N to navigate)" ++ style.reset);
         } else if (mode == .normal) {
-            try self.stdout.writeAll(style.gray ++ "Press : to enter COMMAND mode" ++ style.reset);
+            try self.stdout.writeAll(style.gray ++ "Press : to enter COMMAND mode or / to enter SEARCH mode" ++ style.reset);
         }
         try self.stdout.writeAll("\r\n");
     }
