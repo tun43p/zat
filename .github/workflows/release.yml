@@ -47,6 +47,14 @@ jobs:
             rm -rf zig-out
           done
 
+      - name: Compute checksums
+        id: checksums
+        run: |
+          echo "x86_64_macos=$(sha256sum zat-x86_64-macos.tar.gz | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "aarch64_macos=$(sha256sum zat-aarch64-macos.tar.gz | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "x86_64_linux=$(sha256sum zat-x86_64-linux.tar.gz | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "aarch64_linux=$(sha256sum zat-aarch64-linux.tar.gz | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
@@ -54,3 +62,62 @@ jobs:
           name: ${{ steps.version.outputs.tag }}
           generate_release_notes: true
           files: zat-*.tar.gz
+
+      - name: Update Homebrew formula
+        uses: actions/checkout@v4
+        with:
+          repository: tun43p/homebrew-tap
+          token: ${{ secrets.TAP_GITHUB_TOKEN }}
+          path: homebrew-tap
+
+      - name: Write formula
+        run: |
+          VERSION="${{ steps.version.outputs.tag }}"
+          VERSION="${VERSION#v}"
+          cat > homebrew-tap/Formula/zat.rb << 'FORMULA'
+          class Zat < Formula
+            desc "What cat would be if it went to the gym, thanks to Zig."
+            homepage "https://github.com/tun43p/zat"
+            version "VERSION_PLACEHOLDER"
+            license "MIT"
+
+            on_macos do
+              if Hardware::CPU.arm?
+                url "https://github.com/tun43p/zat/releases/download/vVERSION_PLACEHOLDER/zat-aarch64-macos.tar.gz"
+                sha256 "SHA_AARCH64_MACOS"
+              else
+                url "https://github.com/tun43p/zat/releases/download/vVERSION_PLACEHOLDER/zat-x86_64-macos.tar.gz"
+                sha256 "SHA_X86_64_MACOS"
+              end
+            end
+
+            on_linux do
+              if Hardware::CPU.arm?
+                url "https://github.com/tun43p/zat/releases/download/vVERSION_PLACEHOLDER/zat-aarch64-linux.tar.gz"
+                sha256 "SHA_AARCH64_LINUX"
+              else
+                url "https://github.com/tun43p/zat/releases/download/vVERSION_PLACEHOLDER/zat-x86_64-linux.tar.gz"
+                sha256 "SHA_X86_64_LINUX"
+              end
+            end
+
+            def install
+              bin.install "zat"
+            end
+          end
+          FORMULA
+
+          sed -i "s/VERSION_PLACEHOLDER/$VERSION/g" homebrew-tap/Formula/zat.rb
+          sed -i "s/SHA_AARCH64_MACOS/${{ steps.checksums.outputs.aarch64_macos }}/g" homebrew-tap/Formula/zat.rb
+          sed -i "s/SHA_X86_64_MACOS/${{ steps.checksums.outputs.x86_64_macos }}/g" homebrew-tap/Formula/zat.rb
+          sed -i "s/SHA_AARCH64_LINUX/${{ steps.checksums.outputs.aarch64_linux }}/g" homebrew-tap/Formula/zat.rb
+          sed -i "s/SHA_X86_64_LINUX/${{ steps.checksums.outputs.x86_64_linux }}/g" homebrew-tap/Formula/zat.rb
+
+      - name: Push formula update
+        run: |
+          cd homebrew-tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/zat.rb
+          git commit -m "release: update zat to ${{ steps.version.outputs.tag }}"
+          git push
