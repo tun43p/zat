@@ -1,6 +1,8 @@
 const std = @import("std");
 const size = @import("size.zig").Size;
 const ZatFile = @import("file.zig").ZatFile;
+const style = @import("style.zig").Style;
+const chars = @import("chars.zig").Chars;
 
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
@@ -30,7 +32,8 @@ pub fn main() !void {
 
     // Get terminal size
     const term_size = try size.get(stdout) orelse return error.TerminalSizeNotFound;
-    const visible_lines: usize = term_size.height - 2; // -2 for status bar
+    const visible_lines: usize = term_size.height - 3; // -3 for separator + footer + padding
+    const width: usize = term_size.width;
 
     // Raw mode
     const original = try std.posix.tcgetattr(stdin);
@@ -45,7 +48,7 @@ pub fn main() !void {
     // Main loop
     var scroll: usize = 0;
 
-    try render(stdout, lines.items, scroll, visible_lines, file);
+    try render(stdout, lines.items, scroll, visible_lines, width, file);
 
     while (true) {
         var buf: [1]u8 = undefined;
@@ -58,23 +61,36 @@ pub fn main() !void {
 
         switch (c) {
             'q' => break,
-            'j' => { // TODO: handle down arrow
-                if (scroll + visible_lines < lines.items.len) {
-                    scroll += 1;
-                    changed = true;
-                }
+            'j' => {
+                scrollDown(&scroll, lines.items, visible_lines);
+                changed = true;
             },
-            'k' => { // TODO: handle up arrow
-                if (scroll > 0) {
-                    scroll -= 1;
-                    changed = true;
+            'k' => {
+                scrollUp(&scroll);
+                changed = true;
+            },
+            '\x1b' => {
+                var seq: [2]u8 = undefined;
+                const seq_n = reader.read(&seq) catch break;
+                if (seq_n == 2 and seq[0] == '[') {
+                    switch (seq[1]) {
+                        'A' => {
+                            scrollUp(&scroll);
+                            changed = true;
+                        },
+                        'B' => {
+                            scrollDown(&scroll, lines.items, visible_lines);
+                            changed = true;
+                        },
+                        else => {},
+                    }
                 }
             },
             else => {},
         }
 
         if (changed) {
-            try render(stdout, lines.items, scroll, visible_lines, file);
+            try render(stdout, lines.items, scroll, visible_lines, width, file);
         }
     }
 
@@ -85,34 +101,77 @@ pub fn main() !void {
     try std.posix.tcsetattr(stdin, .FLUSH, original);
 }
 
-fn render(stdout: std.fs.File, lines: []const []const u8, scroll: usize, visible_lines: usize, file: ZatFile) !void {
-    // Cursor to top-left
-    try stdout.writeAll("\x1b[H");
+fn render(stdout: std.fs.File, lines: []const []const u8, scroll: usize, visible_lines: usize, width: usize, file: ZatFile) !void {
+    const gutter = 5;
 
-    // Clear screen
-    try stdout.writeAll("\x1b[2J");
+    // Cursor to top-left + clear screen
+    try stdout.writeAll("\x1b[H\x1b[2J");
+
+    // Header with ZatFile infos
+    try stdout.writeAll(style.red);
+    for (0..gutter) |_| try stdout.writeAll(" ");
+    try stdout.writeAll(chars.pipe ++ " ");
+
+    // File name
+    try stdout.writeAll(style.cyan ++ style.bold);
+    try stdout.writeAll(file.name);
+
+    // File path
+    try stdout.writeAll(style.red ++ " " ++ chars.pipe ++ " ");
+    try stdout.writeAll(style.gray);
+    try stdout.writeAll(file.path);
+
+    // File mime
+    try stdout.writeAll(style.red ++ " " ++ chars.pipe ++ " ");
+    try stdout.writeAll(style.bright_blue);
+    try stdout.writeAll(file.mime);
+
+    // File lines
+    try stdout.writeAll(style.red ++ " " ++ chars.pipe ++ " ");
+    try stdout.writeAll(style.bright_yellow);
+    var lines_buf: [32]u8 = undefined;
+    const lines_str = std.fmt.bufPrint(&lines_buf, "{d}/{d} lines", .{ scroll + 1, file.line_count }) catch "?";
+    try stdout.writeAll(lines_str);
+
+    // File size
+    try stdout.writeAll(style.red ++ " " ++ chars.pipe ++ " ");
+    try stdout.writeAll(style.bright_cyan);
+    var size_buf: [32]u8 = undefined;
+    const size_str = std.fmt.bufPrint(&size_buf, "{d} bytes", .{file.size}) catch "?";
+    try stdout.writeAll(size_str);
+
+    // File encoding
+    try stdout.writeAll(style.red ++ " " ++ chars.pipe ++ " ");
+    try stdout.writeAll(style.bright_green);
+    try stdout.writeAll(file.encoding);
+    try stdout.writeAll(style.reset ++ "\r\n");
+
+    // Separator line below header
+    try stdout.writeAll(style.red);
+    for (0..gutter) |_| try stdout.writeAll(chars.row);
+    try stdout.writeAll(chars.cross);
+    for (0..width - gutter - 1) |_| try stdout.writeAll(chars.row);
+    try stdout.writeAll(style.reset ++ "\r\n");
 
     // Display visible lines
     const end = @min(scroll + visible_lines, lines.len);
     for (scroll..end) |i| {
         var num_buf: [32]u8 = undefined;
-        const num = std.fmt.bufPrint(&num_buf, "\x1b[31m{d: >4}\x1b[0m │ ", .{i + 1}) catch continue;
+        const num = std.fmt.bufPrint(&num_buf, style.red ++ "{d: >4} " ++ chars.pipe ++ " " ++ style.reset, .{i + 1}) catch continue;
         try stdout.writeAll(num);
         try stdout.writeAll(lines[i]);
         try stdout.writeAll("\r\n");
     }
+}
 
-    // Status bar with ZatFile infos
-    var status_buf: [256]u8 = undefined;
-    const status = std.fmt.bufPrint(&status_buf, "\x1b[7m {s} | {s} | {s} | {d}/{d} lines | {d} bytes | {s} \x1b[0m", .{
-        file.name,
-        file.path,
-        file.mime,
-        scroll + 1,
-        file.line_count,
-        file.size,
-        file.encoding,
-    }) catch "";
+fn scrollDown(scroll: *usize, lines: []const []const u8, visible_lines: usize) void {
+    if (scroll.* + visible_lines < lines.len) {
+        scroll.* += 1;
+    }
+}
 
-    try stdout.writeAll(status);
+fn scrollUp(scroll: *usize) void {
+    if (scroll.* > 0) {
+        scroll.* -= 1;
+    }
 }

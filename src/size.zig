@@ -44,7 +44,3 @@ pub const Size = struct {
         };
     }
 };
-
-test "get" {
-    std.debug.print("termsize {any}", .{Size.get(std.io.getStdOut())});
-}
