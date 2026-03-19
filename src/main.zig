@@ -23,6 +23,14 @@ pub fn main() !void {
     const file = try File.init(allocator, file_path);
     defer file.deinit(allocator);
 
+    if (!file.readable) {
+        const stdout = std.fs.File{ .handle = std.posix.STDOUT_FILENO };
+        try stdout.writeAll("Error: cannot display file of type ");
+        try stdout.writeAll(file.mime);
+        try stdout.writeAll("\n");
+        return;
+    }
+
     // Split content into lines
     var lines: std.ArrayList([]const u8) = .empty;
     var it = std.mem.splitScalar(u8, file.content, '\n');

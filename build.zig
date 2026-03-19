@@ -10,9 +10,7 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/main.zig"),
             .target = target,
             .optimize = optimize,
-            .imports = &.{
-                .{ .name = "mime", .module = b.dependency("mime", .{}).module("mime") },
-            },
+            .imports = &.{},
         }),
     });
 
