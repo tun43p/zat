@@ -30,7 +30,12 @@ pub fn main() !void {
     }
 
     // Load file
-    const file = try File.init(allocator, file_path);
+    const file = File.init(allocator, file_path) catch |err| {
+        var err_buf: [512]u8 = undefined;
+        const msg = std.fmt.bufPrint(&err_buf, "Error: could not open '{s}': {s}\n", .{ file_path, @errorName(err) }) catch "Error: could not open file\n";
+        try stdout.writeAll(msg);
+        return;
+    };
 
     if (!file.readable) {
         try stdout.writeAll("Error: cannot display file of type ");
@@ -53,7 +58,9 @@ pub fn main() !void {
     // Setup renderer
     const term_size = try TerminalSize.get(term.stdout) orelse return error.TerminalSizeNotFound;
     const visible_lines: usize = if (term_size.height > 6) term_size.height - 6 else 1; // top + header + sep + footer sep + footer + bottom
-    const renderer = Renderer.init(term.stdout, term_size.width, term_size.height, file.mime);
+    var write_buf: [4096]u8 = undefined;
+    var stdout_writer = term.stdout.writer(&write_buf);
+    var renderer = Renderer.init(&stdout_writer.interface, term_size.width, term_size.height, file.mime);
 
     // State
     var scroll: usize = 0;

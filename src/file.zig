@@ -22,6 +22,9 @@ pub const File = struct {
         const file_ext = std.fs.path.extension(file_path);
         const mime_info = mime.fromExtension(file_ext);
 
+        const max_file_size = 50 * 1024 * 1024; // 50 MB
+        if (file_size > max_file_size) return error.FileTooLarge;
+
         if (!mime_info.readable) {
             return File{
                 .path = file_path,
