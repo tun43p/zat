@@ -189,3 +189,59 @@ pub fn fromExtension(ext: []const u8) MimeInfo {
 
     return .{ .mime = "text/plain", .readable = true };
 }
+
+pub fn fromFilename(name: []const u8) ?MimeInfo {
+    const name_map = .{
+        .{ "Makefile", "text/x-shellscript" },
+        .{ "Dockerfile", "text/x-shellscript" },
+        .{ "Vagrantfile", "text/x-ruby" },
+        .{ "Rakefile", "text/x-ruby" },
+        .{ "Gemfile", "text/x-ruby" },
+        .{ "Justfile", "text/x-shellscript" },
+        .{ "CMakeLists.txt", "text/x-shellscript" },
+        .{ ".bashrc", "text/x-shellscript" },
+        .{ ".zshrc", "text/x-shellscript" },
+        .{ ".profile", "text/x-shellscript" },
+        .{ ".bash_profile", "text/x-shellscript" },
+        .{ ".gitignore", "text/plain" },
+        .{ ".gitconfig", "text/toml" },
+        .{ ".editorconfig", "text/toml" },
+        .{ ".env", "text/x-shellscript" },
+    };
+
+    inline for (name_map) |entry| {
+        if (std.mem.eql(u8, name, entry[0])) return .{ .mime = entry[1], .readable = true };
+    }
+
+    return null;
+}
+
+test "fromExtension returns correct MIME for known extensions" {
+    const zig = fromExtension(".zig");
+    try std.testing.expectEqualStrings("text/x-zig", zig.mime);
+    try std.testing.expect(zig.readable);
+
+    const html = fromExtension(".html");
+    try std.testing.expectEqualStrings("text/html", html.mime);
+    try std.testing.expect(html.readable);
+
+    const py = fromExtension(".py");
+    try std.testing.expectEqualStrings("text/x-python", py.mime);
+    try std.testing.expect(py.readable);
+}
+
+test "fromExtension returns non-readable for binary files" {
+    const png = fromExtension(".png");
+    try std.testing.expectEqualStrings("image/png", png.mime);
+    try std.testing.expect(!png.readable);
+
+    const wasm = fromExtension(".wasm");
+    try std.testing.expectEqualStrings("application/wasm", wasm.mime);
+    try std.testing.expect(!wasm.readable);
+}
+
+test "fromExtension returns text/plain for unknown extensions" {
+    const unknown = fromExtension(".xyz_unknown");
+    try std.testing.expectEqualStrings("text/plain", unknown.mime);
+    try std.testing.expect(unknown.readable);
+}
