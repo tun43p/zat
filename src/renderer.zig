@@ -1,5 +1,6 @@
 const std = @import("std");
 const File = @import("file.zig").File;
+const syntax = @import("syntax.zig");
 
 pub const Mode = enum { normal, command, search };
 
@@ -11,13 +12,22 @@ const style = Style;
 const table_color = style.gray;
 const number_color = style.bright_yellow;
 
+// Syntax highlight colors
+const comment_color = style.gray;
+const string_color = style.green;
+const keyword_color = style.magenta;
+const type_color = style.bright_yellow;
+const number_literal_color = style.bright_cyan;
+const builtin_color = style.bright_blue;
+
 pub const Renderer = struct {
     stdout: std.fs.File,
     width: usize,
     height: usize,
+    syntax_def: ?syntax.SyntaxDef,
 
-    pub fn init(stdout: std.fs.File, width: usize, height: usize) Renderer {
-        return .{ .stdout = stdout, .width = width, .height = height };
+    pub fn init(stdout: std.fs.File, width: usize, height: usize, mime_type: []const u8) Renderer {
+        return .{ .stdout = stdout, .width = width, .height = height, .syntax_def = syntax.fromMime(mime_type) };
     }
 
     pub fn render(self: *const Renderer, lines: []const []const u8, scroll: usize, visible_lines: usize, file: File, message: []const u8, mode: Mode, search: []const u8) !void {
@@ -86,11 +96,38 @@ pub const Renderer = struct {
 
     fn renderLines(self: *const Renderer, lines: []const []const u8, scroll: usize, visible_lines: usize, search: []const u8) !void {
         const end = @min(scroll + visible_lines, lines.len);
+
+        // Compute code block state from start of file to scroll position
+        var in_code_block = false;
+        for (0..scroll) |i| {
+            const trimmed = std.mem.trimLeft(u8, lines[i], " ");
+            if (trimmed.len >= 3 and std.mem.eql(u8, trimmed[0..3], "```")) {
+                in_code_block = !in_code_block;
+            }
+        }
+
         for (scroll..end) |i| {
             var num_buf: [32]u8 = undefined;
             const num = std.fmt.bufPrint(&num_buf, number_color ++ "{d: >4} " ++ table_color ++ chars.pipe ++ " " ++ style.reset, .{i + 1}) catch continue;
             try self.stdout.writeAll(num);
-            try self.renderLineWithHighlight(lines[i], search);
+
+            const trimmed = std.mem.trimLeft(u8, lines[i], " ");
+            const is_fence = trimmed.len >= 3 and std.mem.eql(u8, trimmed[0..3], "```");
+
+            if (is_fence) {
+                // The fence line itself is green
+                try self.stdout.writeAll(string_color);
+                try self.renderWithSearch(lines[i], search);
+                try self.stdout.writeAll(style.reset);
+                in_code_block = !in_code_block;
+            } else if (in_code_block) {
+                // Inside code block: all green
+                try self.stdout.writeAll(string_color);
+                try self.renderWithSearch(lines[i], search);
+                try self.stdout.writeAll(style.reset);
+            } else {
+                try self.renderLineWithHighlight(lines[i], search);
+            }
             try self.stdout.writeAll("\r\n");
         }
 
@@ -106,27 +143,151 @@ pub const Renderer = struct {
     }
 
     fn renderLineWithHighlight(self: *const Renderer, line: []const u8, search: []const u8) !void {
-        if (search.len == 0) {
-            try self.stdout.writeAll(line);
+        const syn = self.syntax_def orelse {
+            // No syntax: just handle search highlight
+            try self.renderWithSearch(line, search);
             return;
+        };
+
+        // Check for line prefixes (markdown headings, lists, etc.)
+        const trimmed = std.mem.trimLeft(u8, line, " ");
+        for (syn.line_prefixes) |lp| {
+            if (trimmed.len >= lp.prefix.len and std.mem.eql(u8, trimmed[0..lp.prefix.len], lp.prefix)) {
+                try self.stdout.writeAll(lp.color);
+                try self.renderWithSearch(line, search);
+                try self.stdout.writeAll(style.reset);
+                return;
+            }
         }
 
         var pos: usize = 0;
         while (pos < line.len) {
-            if (std.mem.indexOf(u8, line[pos..], search)) |match| {
-                // Text before match
-                try self.stdout.writeAll(line[pos .. pos + match]);
-                // Highlighted match
+            // Check for line comment
+            if (syn.line_comment.len > 0 and pos + syn.line_comment.len <= line.len and std.mem.eql(u8, line[pos .. pos + syn.line_comment.len], syn.line_comment)) {
+                try self.stdout.writeAll(comment_color);
+                try self.renderWithSearch(line[pos..], search);
+                try self.stdout.writeAll(style.reset);
+                return;
+            }
+
+            // Check for string
+            if (self.isStringDelim(syn, line[pos])) {
+                const delim = line[pos];
+                var end = pos + 1;
+                while (end < line.len) {
+                    if (line[end] == '\\') {
+                        end += 2;
+                        continue;
+                    }
+                    if (line[end] == delim) {
+                        end += 1;
+                        break;
+                    }
+                    end += 1;
+                }
+                try self.stdout.writeAll(string_color);
+                try self.renderWithSearch(line[pos..end], search);
+                try self.stdout.writeAll(style.reset);
+                pos = end;
+                continue;
+            }
+
+            // Check for word (keyword, type, or identifier)
+            if (isWordChar(line[pos])) {
+                var end = pos;
+                while (end < line.len and isWordChar(line[end])) : (end += 1) {}
+                const word = line[pos..end];
+
+                const is_at_boundary = (pos == 0 or !isWordChar(line[pos - 1])) and (end >= line.len or !isWordChar(line[end]));
+
+                if (is_at_boundary and self.isBuiltin(syn, word)) {
+                    try self.stdout.writeAll(builtin_color);
+                    try self.renderWithSearch(word, search);
+                    try self.stdout.writeAll(style.reset);
+                } else if (is_at_boundary and self.isKeyword(syn, word)) {
+                    try self.stdout.writeAll(keyword_color ++ style.bold);
+                    try self.renderWithSearch(word, search);
+                    try self.stdout.writeAll(style.reset);
+                } else if (is_at_boundary and self.isType(syn, word)) {
+                    try self.stdout.writeAll(type_color);
+                    try self.renderWithSearch(word, search);
+                    try self.stdout.writeAll(style.reset);
+                } else if (is_at_boundary and isNumberLiteral(word)) {
+                    try self.stdout.writeAll(number_literal_color);
+                    try self.renderWithSearch(word, search);
+                    try self.stdout.writeAll(style.reset);
+                } else {
+                    try self.renderWithSearch(word, search);
+                }
+                pos = end;
+                continue;
+            }
+
+            // Single character (operator, punctuation, etc.)
+            try self.renderWithSearch(line[pos .. pos + 1], search);
+            pos += 1;
+        }
+    }
+
+    fn renderWithSearch(self: *const Renderer, text: []const u8, search: []const u8) !void {
+        if (search.len == 0) {
+            try self.stdout.writeAll(text);
+            return;
+        }
+
+        var pos: usize = 0;
+        while (pos < text.len) {
+            if (std.mem.indexOf(u8, text[pos..], search)) |match| {
+                try self.stdout.writeAll(text[pos .. pos + match]);
                 try self.stdout.writeAll(style.bg_yellow ++ style.black);
-                try self.stdout.writeAll(line[pos + match .. pos + match + search.len]);
+                try self.stdout.writeAll(text[pos + match .. pos + match + search.len]);
                 try self.stdout.writeAll(style.reset);
                 pos += match + search.len;
             } else {
-                // Rest of line
-                try self.stdout.writeAll(line[pos..]);
+                try self.stdout.writeAll(text[pos..]);
                 break;
             }
         }
+    }
+
+    fn isStringDelim(_: *const Renderer, syn: syntax.SyntaxDef, c: u8) bool {
+        for (syn.string_delims) |d| {
+            if (c == d) return true;
+        }
+        return false;
+    }
+
+    fn isBuiltin(_: *const Renderer, syn: syntax.SyntaxDef, word: []const u8) bool {
+        for (syn.builtins) |b| {
+            if (std.mem.eql(u8, word, b)) return true;
+        }
+        return false;
+    }
+
+    fn isKeyword(_: *const Renderer, syn: syntax.SyntaxDef, word: []const u8) bool {
+        for (syn.keywords) |kw| {
+            if (std.mem.eql(u8, word, kw)) return true;
+        }
+        return false;
+    }
+
+    fn isType(_: *const Renderer, syn: syntax.SyntaxDef, word: []const u8) bool {
+        for (syn.types) |t| {
+            if (std.mem.eql(u8, word, t)) return true;
+        }
+        return false;
+    }
+
+    fn isWordChar(c: u8) bool {
+        return std.ascii.isAlphanumeric(c) or c == '_' or c == '@';
+    }
+
+    fn isNumberLiteral(word: []const u8) bool {
+        if (word.len == 0) return false;
+        if (std.ascii.isDigit(word[0])) return true;
+        // Negative numbers
+        if (word[0] == '-' and word.len > 1 and std.ascii.isDigit(word[1])) return true;
+        return false;
     }
 
     fn renderFooter(self: *const Renderer, message: []const u8, mode: Mode, search: []const u8) !void {
