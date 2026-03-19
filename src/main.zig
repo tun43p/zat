@@ -45,8 +45,11 @@ pub fn main() !void {
     var cmd_buf: [256]u8 = undefined;
     var cmd_len: usize = 0;
     var message: []const u8 = "";
+    var search_buf: [256]u8 = undefined;
+    var search_len: usize = 0;
+    var search_term: []const u8 = "";
 
-    try renderer.render(lines.items, scroll, visible_lines, file, message, mode);
+    try renderer.render(lines.items, scroll, visible_lines, file, message, mode, search_term);
 
     while (true) {
         const c = term.readKey() orelse break;
@@ -56,11 +59,41 @@ pub fn main() !void {
                 switch (c) {
                     'j' => {
                         if (scroll + visible_lines < lines.items.len) scroll += 1;
-                        try renderer.render(lines.items, scroll, visible_lines, file, message, mode);
+                        try renderer.render(lines.items, scroll, visible_lines, file, message, mode, search_term);
                     },
                     'k' => {
                         if (scroll > 0) scroll -= 1;
-                        try renderer.render(lines.items, scroll, visible_lines, file, message, mode);
+                        try renderer.render(lines.items, scroll, visible_lines, file, message, mode, search_term);
+                    },
+                    'n' => {
+                        if (search_term.len > 0) {
+                            // Find next match starting from current scroll + 1
+                            var i = scroll + 1;
+                            while (i < lines.items.len) : (i += 1) {
+                                if (std.mem.indexOf(u8, lines.items[i], search_term) != null) {
+                                    scroll = if (i + visible_lines <= lines.items.len) i else lines.items.len - visible_lines;
+                                    break;
+                                }
+                            }
+                            try renderer.render(lines.items, scroll, visible_lines, file, message, mode, search_term);
+                        }
+                    },
+                    'N' => {
+                        if (search_term.len > 0) {
+                            // Find previous match starting from current scroll - 1
+                            if (scroll > 0) {
+                                var i = scroll - 1;
+                                while (true) {
+                                    if (std.mem.indexOf(u8, lines.items[i], search_term) != null) {
+                                        scroll = i;
+                                        break;
+                                    }
+                                    if (i == 0) break;
+                                    i -= 1;
+                                }
+                                try renderer.render(lines.items, scroll, visible_lines, file, message, mode, search_term);
+                            }
+                        }
                     },
                     ':' => {
                         mode = .command;
@@ -70,20 +103,30 @@ pub fn main() !void {
                     },
                     '/' => {
                         mode = .search;
-                        // TODO: Implement search mode
+                        search_len = 0;
+                        message = "";
+                        try renderer.renderSearchLine(search_buf[0..0]);
                     },
                     '\x1b' => {
                         if (term.readEscapeSeq()) |seq| {
                             switch (seq) {
                                 'A' => {
                                     if (scroll > 0) scroll -= 1;
-                                    try renderer.render(lines.items, scroll, visible_lines, file, message, mode);
+                                    try renderer.render(lines.items, scroll, visible_lines, file, message, mode, search_term);
                                 },
                                 'B' => {
                                     if (scroll + visible_lines < lines.items.len) scroll += 1;
-                                    try renderer.render(lines.items, scroll, visible_lines, file, message, mode);
+                                    try renderer.render(lines.items, scroll, visible_lines, file, message, mode, search_term);
                                 },
                                 else => {},
+                            }
+                        } else {
+                            // Esc without sequence: clear search
+                            if (search_term.len > 0) {
+                                search_term = "";
+                                search_len = 0;
+                                message = "";
+                                try renderer.render(lines.items, scroll, visible_lines, file, message, mode, search_term);
                             }
                         }
                     },
@@ -95,7 +138,7 @@ pub fn main() !void {
                     '\x1b' => {
                         mode = .normal;
                         message = "";
-                        try renderer.render(lines.items, scroll, visible_lines, file, message, mode);
+                        try renderer.render(lines.items, scroll, visible_lines, file, message, mode, search_term);
                     },
                     '\r', '\n' => {
                         const cmd = cmd_buf[0..cmd_len];
@@ -107,7 +150,7 @@ pub fn main() !void {
                             message = "Unknown command. Type :help for available commands.";
                         }
                         mode = .normal;
-                        try renderer.render(lines.items, scroll, visible_lines, file, message, mode);
+                        try renderer.render(lines.items, scroll, visible_lines, file, message, mode, search_term);
                     },
                     127 => {
                         if (cmd_len > 0) cmd_len -= 1;
@@ -123,7 +166,31 @@ pub fn main() !void {
                 }
             },
             .search => {
-                // TODO: Implement search mode
+                switch (c) {
+                    '\x1b' => {
+                        mode = .normal;
+                        search_term = "";
+                        message = "";
+                        try renderer.render(lines.items, scroll, visible_lines, file, message, mode, search_term);
+                    },
+                    '\r', '\n' => {
+                        search_term = search_buf[0..search_len];
+                        mode = .normal;
+                        message = "";
+                        try renderer.render(lines.items, scroll, visible_lines, file, message, mode, search_term);
+                    },
+                    127 => {
+                        if (search_len > 0) search_len -= 1;
+                        try renderer.renderSearchLine(search_buf[0..search_len]);
+                    },
+                    else => {
+                        if (search_len < search_buf.len and c >= 32) {
+                            search_buf[search_len] = c;
+                            search_len += 1;
+                            try renderer.renderSearchLine(search_buf[0..search_len]);
+                        }
+                    },
+                }
             },
         }
     }
