@@ -1,4 +1,5 @@
 const std = @import("std");
+const build_options = @import("build_options");
 
 const File = @import("file.zig").File;
 const Mode = @import("renderer.zig").Mode;
@@ -6,25 +7,31 @@ const Renderer = @import("renderer.zig").Renderer;
 const Terminal = @import("terminal.zig").Terminal;
 const TerminalSize = @import("terminal.zig").TerminalSize;
 
+const version = build_options.version;
+
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
+    const stdout = std.fs.File{ .handle = std.posix.STDOUT_FILENO };
 
     // Get file path from arguments
     var args = try std.process.argsWithAllocator(allocator);
     defer args.deinit();
     _ = args.skip();
     const file_path = args.next() orelse {
-        const stdout = std.fs.File{ .handle = std.posix.STDOUT_FILENO };
         try stdout.writeAll("Usage: zat <file>\n");
         return;
     };
+
+    if (std.mem.eql(u8, file_path, "--version") or std.mem.eql(u8, file_path, "-v")) {
+        try stdout.writeAll("zat " ++ version ++ "\n");
+        return;
+    }
 
     // Load file
     const file = try File.init(allocator, file_path);
     defer file.deinit(allocator);
 
     if (!file.readable) {
-        const stdout = std.fs.File{ .handle = std.posix.STDOUT_FILENO };
         try stdout.writeAll("Error: cannot display file of type ");
         try stdout.writeAll(file.mime);
         try stdout.writeAll("\n");

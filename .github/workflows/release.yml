@@ -42,7 +42,7 @@ jobs:
           TARGETS="x86_64-linux aarch64-linux x86_64-macos aarch64-macos"
           for target in $TARGETS; do
             echo "Building for $target..."
-            zig build -Dtarget=$target -Doptimize=ReleaseSafe
+            zig build -Dtarget=$target -Doptimize=ReleaseSafe -Dversion="${{ steps.version.outputs.tag }}"
             tar -czf "zat-${target}.tar.gz" -C zig-out/bin zat
             rm -rf zig-out
           done

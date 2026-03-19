@@ -4,13 +4,20 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const version = b.option([]const u8, "version", "Override version string") orelse "dev";
+
+    const options = b.addOptions();
+    options.addOption([]const u8, "version", version);
+
     const exe = b.addExecutable(.{
         .name = "zat",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
             .target = target,
             .optimize = optimize,
-            .imports = &.{},
+            .imports = &.{
+                .{ .name = "build_options", .module = options.createModule() },
+            },
         }),
     });
 
