@@ -93,6 +93,16 @@ pub const Renderer = struct {
             try self.renderLineWithHighlight(lines[i], search);
             try self.stdout.writeAll("\r\n");
         }
+
+        // Fill remaining empty lines with gutter
+        const rendered = end - scroll;
+        if (rendered < visible_lines) {
+            for (0..visible_lines - rendered) |_| {
+                try self.stdout.writeAll(table_color);
+                for (0..gutter) |_| try self.stdout.writeAll(" ");
+                try self.stdout.writeAll(chars.pipe ++ style.reset ++ "\r\n");
+            }
+        }
     }
 
     fn renderLineWithHighlight(self: *const Renderer, line: []const u8, search: []const u8) !void {
