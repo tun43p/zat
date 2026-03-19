@@ -53,10 +53,15 @@ zat <file>
 
 ### Navigation
 
-| Key                | Action      |
-| ------------------ | ----------- |
-| `j` / `Arrow Down` | Scroll down |
-| `k` / `Arrow Up`   | Scroll up   |
+| Key                | Action         |
+| ------------------ | -------------- |
+| `j` / `Arrow Down` | Scroll down    |
+| `k` / `Arrow Up`   | Scroll up      |
+| `g`                | Go to top      |
+| `G`                | Go to bottom   |
+| `d`                | Half page down |
+| `u`                | Half page up   |
+| `Space`            | Page down      |
 
 ### Command Mode
 
@@ -69,6 +74,7 @@ zat <file>
 | ------- | ----------------------- |
 | `:q`    | Quit                    |
 | `:help` | Show available commands |
+| `:N`    | Go to line N            |
 
 ### Search Mode
 

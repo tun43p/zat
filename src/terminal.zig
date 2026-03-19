@@ -1,6 +1,23 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
+var saved_termios: std.posix.termios = undefined;
+var termios_saved: bool = false;
+var terminal_resized: bool = false;
+
+fn signalHandler(_: c_int) callconv(.c) void {
+    if (termios_saved) {
+        const stdout = std.fs.File{ .handle = std.posix.STDOUT_FILENO };
+        stdout.writeAll("\x1b[?1049l") catch {};
+        std.posix.tcsetattr(std.posix.STDIN_FILENO, .FLUSH, saved_termios) catch {};
+    }
+    std.posix.exit(1);
+}
+
+fn winchHandler(_: c_int) callconv(.c) void {
+    terminal_resized = true;
+}
+
 pub const Terminal = struct {
     stdin: std.posix.fd_t,
     stdout: std.fs.File,
@@ -17,6 +34,26 @@ pub const Terminal = struct {
         raw.lflag.ECHO = false;
         raw.lflag.ICANON = false;
         try std.posix.tcsetattr(stdin, .FLUSH, raw);
+
+        // Save for signal handler
+        saved_termios = original;
+        termios_saved = true;
+
+        // Install signal handlers
+        const sigact = std.posix.Sigaction{
+            .handler = .{ .handler = signalHandler },
+            .mask = std.posix.sigemptyset(),
+            .flags = 0,
+        };
+        std.posix.sigaction(std.posix.SIG.INT, &sigact, null);
+        std.posix.sigaction(std.posix.SIG.TERM, &sigact, null);
+
+        const winch_act = std.posix.Sigaction{
+            .handler = .{ .handler = winchHandler },
+            .mask = std.posix.sigemptyset(),
+            .flags = 0,
+        };
+        std.posix.sigaction(std.posix.SIG.WINCH, &winch_act, null);
 
         // Enter alternate screen
         try stdout.writeAll("\x1b[?1049h");
@@ -35,6 +72,14 @@ pub const Terminal = struct {
 
         // Restore terminal
         std.posix.tcsetattr(self.stdin, .FLUSH, self.original) catch {};
+    }
+
+    pub fn checkResized(_: *const Terminal) bool {
+        if (terminal_resized) {
+            terminal_resized = false;
+            return true;
+        }
+        return false;
     }
 
     pub fn readKey(self: *const Terminal) ?u8 {

@@ -195,7 +195,7 @@ const haskell_def = SyntaxDef{
 const ocaml_def = SyntaxDef{
     .keywords = &.{ "and", "as", "assert", "begin", "class", "constraint", "do", "done", "downto", "else", "end", "exception", "external", "false", "for", "fun", "function", "functor", "if", "in", "include", "inherit", "initializer", "lazy", "let", "match", "method", "module", "mutable", "new", "object", "of", "open", "or", "private", "rec", "sig", "struct", "then", "to", "true", "try", "type", "val", "virtual", "when", "while", "with" },
     .types = &.{ "int", "float", "bool", "char", "string", "unit", "list", "array", "option", "ref" },
-    .line_comment = "(*",
+    .line_comment = "",
     .string_delims = "\"'",
 };
 
@@ -223,14 +223,14 @@ const toml_def = SyntaxDef{
 const css_def = SyntaxDef{
     .keywords = &.{ "important", "inherit", "initial", "unset", "none", "auto", "block", "inline", "flex", "grid", "absolute", "relative", "fixed", "sticky", "solid", "dashed", "dotted", "hidden", "visible", "transparent" },
     .types = &.{},
-    .line_comment = "//",
+    .line_comment = "",
     .string_delims = "\"'",
 };
 
 const html_def = SyntaxDef{
     .keywords = &.{},
     .types = &.{},
-    .line_comment = "<!--",
+    .line_comment = "",
     .string_delims = "\"'",
 };
 
@@ -241,15 +241,47 @@ const markdown_def = SyntaxDef{
     .string_delims = "`",
     .line_prefixes = &.{
         .{ .prefix = "######", .color = "\x1b[1m\x1b[36m" }, // h6: bold cyan
-        .{ .prefix = "#####", .color = "\x1b[1m\x1b[36m" },  // h5: bold cyan
-        .{ .prefix = "####", .color = "\x1b[1m\x1b[36m" },   // h4: bold cyan
-        .{ .prefix = "###", .color = "\x1b[1m\x1b[35m" },    // h3: bold magenta
-        .{ .prefix = "##", .color = "\x1b[1m\x1b[33m" },     // h2: bold yellow
-        .{ .prefix = "#", .color = "\x1b[1m\x1b[31m" },      // h1: bold red
-        .{ .prefix = ">", .color = "\x1b[90m" },              // blockquote: gray
-        .{ .prefix = "- ", .color = "\x1b[36m" },             // list: cyan
-        .{ .prefix = "* ", .color = "\x1b[36m" },             // list: cyan
-        .{ .prefix = "---", .color = "\x1b[90m" },            // hr: gray
-        .{ .prefix = "```", .color = "\x1b[32m" },            // code block: green
+        .{ .prefix = "#####", .color = "\x1b[1m\x1b[36m" }, // h5: bold cyan
+        .{ .prefix = "####", .color = "\x1b[1m\x1b[36m" }, // h4: bold cyan
+        .{ .prefix = "###", .color = "\x1b[1m\x1b[35m" }, // h3: bold magenta
+        .{ .prefix = "##", .color = "\x1b[1m\x1b[33m" }, // h2: bold yellow
+        .{ .prefix = "#", .color = "\x1b[1m\x1b[31m" }, // h1: bold red
+        .{ .prefix = ">", .color = "\x1b[90m" }, // blockquote: gray
+        .{ .prefix = "- ", .color = "\x1b[36m" }, // list: cyan
+        .{ .prefix = "* ", .color = "\x1b[36m" }, // list: cyan
+        .{ .prefix = "---", .color = "\x1b[90m" }, // hr: gray
+        .{ .prefix = "```", .color = "\x1b[32m" }, // code block: green
     },
 };
+
+test "fromMime returns SyntaxDef for known MIME types" {
+    const zig_syn = fromMime("text/x-zig");
+    try std.testing.expect(zig_syn != null);
+    try std.testing.expectEqualStrings("//", zig_syn.?.line_comment);
+
+    const py_syn = fromMime("text/x-python");
+    try std.testing.expect(py_syn != null);
+    try std.testing.expectEqualStrings("#", py_syn.?.line_comment);
+
+    const md_syn = fromMime("text/markdown");
+    try std.testing.expect(md_syn != null);
+}
+
+test "fromMime returns null for unknown MIME types" {
+    try std.testing.expect(fromMime("application/octet-stream") == null);
+    try std.testing.expect(fromMime("image/png") == null);
+}
+
+test "CSS, HTML, and OCaml have empty line_comment" {
+    const css_syn = fromMime("text/css");
+    try std.testing.expect(css_syn != null);
+    try std.testing.expectEqualStrings("", css_syn.?.line_comment);
+
+    const html_syn = fromMime("text/html");
+    try std.testing.expect(html_syn != null);
+    try std.testing.expectEqualStrings("", html_syn.?.line_comment);
+
+    const ocaml_syn = fromMime("text/x-ocaml");
+    try std.testing.expect(ocaml_syn != null);
+    try std.testing.expectEqualStrings("", ocaml_syn.?.line_comment);
+}

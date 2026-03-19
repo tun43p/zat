@@ -20,7 +20,13 @@ pub const File = struct {
         const file_path = try std.fs.cwd().realpathAlloc(allocator, path);
         const file_name = std.fs.path.basename(file_path);
         const file_ext = std.fs.path.extension(file_path);
-        const mime_info = mime.fromExtension(file_ext);
+        const mime_info = if (file_ext.len == 0)
+            mime.fromFilename(file_name) orelse mime.fromExtension(file_ext)
+        else
+            mime.fromExtension(file_ext);
+
+        const max_file_size = 50 * 1024 * 1024; // 50 MB
+        if (file_size > max_file_size) return error.FileTooLarge;
 
         if (!mime_info.readable) {
             return File{
@@ -55,8 +61,10 @@ pub const File = struct {
             .content = buffer,
         };
     }
-
-    pub fn deinit(self: File, allocator: std.mem.Allocator) void {
-        allocator.free(self.content);
-    }
 };
+
+test "File.init returns error for non-existent file" {
+    const allocator = std.testing.allocator;
+    const result = File.init(allocator, "/tmp/zat_nonexistent_test_file_12345.txt");
+    try std.testing.expectError(error.FileNotFound, result);
+}
