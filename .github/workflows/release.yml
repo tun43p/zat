@@ -1,0 +1,56 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.15.2
+
+      - name: Determine next version
+        id: version
+        run: |
+          LATEST_TAG=$(git tag -l 'v*' --sort=-v:refname | head -n 1)
+          if [ -z "$LATEST_TAG" ]; then
+            NEXT_VERSION="v0.1.0"
+          else
+            MAJOR=$(echo "$LATEST_TAG" | sed 's/v//' | cut -d. -f1)
+            MINOR=$(echo "$LATEST_TAG" | sed 's/v//' | cut -d. -f2)
+            PATCH=$(echo "$LATEST_TAG" | sed 's/v//' | cut -d. -f3)
+            PATCH=$((PATCH + 1))
+            NEXT_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+          fi
+          echo "tag=$NEXT_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Next version: $NEXT_VERSION"
+
+      - name: Build for all targets
+        run: |
+          TARGETS="x86_64-linux aarch64-linux x86_64-macos aarch64-macos"
+          for target in $TARGETS; do
+            echo "Building for $target..."
+            zig build -Dtarget=$target -Doptimize=ReleaseSafe
+            tar -czf "zat-${target}.tar.gz" -C zig-out/bin zat
+            rm -rf zig-out
+          done
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          generate_release_notes: true
+          files: zat-*.tar.gz
