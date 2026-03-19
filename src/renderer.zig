@@ -30,6 +30,10 @@ pub const Renderer = struct {
         return .{ .stdout = stdout, .width = width, .height = height, .syntax_def = syntax.fromMime(mime_type) };
     }
 
+    fn contentWidth(self: *const Renderer) usize {
+        return if (self.width > gutter + 1) self.width - gutter - 1 else 0;
+    }
+
     pub fn render(self: *const Renderer, lines: []const []const u8, scroll: usize, visible_lines: usize, file: File, message: []const u8, mode: Mode, search: []const u8) !void {
         // Cursor to top-left + clear screen
         try self.stdout.writeAll("\x1b[H\x1b[2J");
@@ -46,7 +50,7 @@ pub const Renderer = struct {
         try self.stdout.writeAll(table_color);
         for (0..gutter) |_| try self.stdout.writeAll(chars.row);
         try self.stdout.writeAll(chars.up_insertion);
-        for (0..self.width - gutter - 1) |_| try self.stdout.writeAll(chars.row);
+        for (0..self.contentWidth()) |_| try self.stdout.writeAll(chars.row);
         try self.stdout.writeAll(style.reset ++ "\r\n");
     }
 
@@ -90,7 +94,7 @@ pub const Renderer = struct {
         try self.stdout.writeAll(table_color);
         for (0..gutter) |_| try self.stdout.writeAll(chars.row);
         try self.stdout.writeAll(chars.cross);
-        for (0..self.width - gutter - 1) |_| try self.stdout.writeAll(chars.row);
+        for (0..self.contentWidth()) |_| try self.stdout.writeAll(chars.row);
         try self.stdout.writeAll(style.reset ++ "\r\n");
     }
 
@@ -300,7 +304,7 @@ pub const Renderer = struct {
         try self.stdout.writeAll(table_color);
         for (0..gutter) |_| try self.stdout.writeAll(chars.row);
         try self.stdout.writeAll(chars.cross);
-        for (0..self.width - gutter - 1) |_| try self.stdout.writeAll(chars.row);
+        for (0..self.contentWidth()) |_| try self.stdout.writeAll(chars.row);
         try self.stdout.writeAll(style.reset ++ "\r\n");
 
         // Footer content (with gutter like header)
@@ -327,7 +331,7 @@ pub const Renderer = struct {
         try self.stdout.writeAll(table_color);
         for (0..gutter) |_| try self.stdout.writeAll(chars.row);
         try self.stdout.writeAll(chars.down_insertion);
-        for (0..self.width - gutter - 1) |_| try self.stdout.writeAll(chars.row);
+        for (0..self.contentWidth()) |_| try self.stdout.writeAll(chars.row);
         try self.stdout.writeAll(style.reset);
     }
 

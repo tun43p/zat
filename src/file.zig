@@ -55,8 +55,4 @@ pub const File = struct {
             .content = buffer,
         };
     }
-
-    pub fn deinit(self: File, allocator: std.mem.Allocator) void {
-        allocator.free(self.content);
-    }
 };

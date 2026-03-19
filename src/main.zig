@@ -10,12 +10,14 @@ const TerminalSize = @import("terminal.zig").TerminalSize;
 const version = build_options.version;
 
 pub fn main() !void {
-    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+
+    const allocator = arena.allocator();
     const stdout = std.fs.File{ .handle = std.posix.STDOUT_FILENO };
 
     // Get file path from arguments
     var args = try std.process.argsWithAllocator(allocator);
-    defer args.deinit();
     _ = args.skip();
     const file_path = args.next() orelse {
         try stdout.writeAll("Usage: zat <file>\n");
@@ -29,7 +31,6 @@ pub fn main() !void {
 
     // Load file
     const file = try File.init(allocator, file_path);
-    defer file.deinit(allocator);
 
     if (!file.readable) {
         try stdout.writeAll("Error: cannot display file of type ");
@@ -51,7 +52,7 @@ pub fn main() !void {
 
     // Setup renderer
     const term_size = try TerminalSize.get(term.stdout) orelse return error.TerminalSizeNotFound;
-    const visible_lines: usize = term_size.height - 6; // top + header + sep + footer sep + footer + bottom
+    const visible_lines: usize = if (term_size.height > 6) term_size.height - 6 else 1; // top + header + sep + footer sep + footer + bottom
     const renderer = Renderer.init(term.stdout, term_size.width, term_size.height, file.mime);
 
     // State
