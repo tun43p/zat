@@ -2,125 +2,52 @@
 
 What `cat` would be if it went to the gym, thanks to Zig.
 
-A modern file reader that automatically detects MIME types.
+A modern, interactive file viewer for the terminal with syntax highlighting, search, and vim-like keybindings.
 
 ![Zat](./docs/zat.png)
 
-## Table of Contents
+## Features
 
-- [Zat](#zat)
-  - [Table of Contents](#table-of-contents)
-  - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
-    - [Using Homebrew](#using-homebrew)
-    - [From Source](#from-source)
-      - [Download](#download)
-      - [Build the project](#build-the-project)
-      - [Build in optimized mode](#build-in-optimized-mode)
-  - [Usage](#usage)
-    - [Basic Usage](#basic-usage)
-    - [Run directly with zig build](#run-directly-with-zig-build)
-    - [Run the compiled executable](#run-the-compiled-executable)
-    - [Install globally (optional)](#install-globally-optional)
-  - [Keyboard Shortcuts](#keyboard-shortcuts)
-    - [Navigation](#navigation)
-    - [Command Mode](#command-mode)
-    - [Search Mode](#search-mode)
-  - [Build Commands](#build-commands)
-  - [Dependencies](#dependencies)
-  - [Testing](#testing)
-  - [Authors](#authors)
-  - [License](#license)
-
-## Prerequisites
-
-- **Zig** version 0.15.2 or higher
-  - Download Zig from [ziglang.org/download](https://ziglang.org/download/)
-  - Check your version: `zig version`
+- Syntax highlighting for 28+ languages
+- Vim-like navigation (`j`/`k`, `/` search, `:` commands)
+- Search with highlighted matches and `n`/`N` navigation
+- MIME type detection
+- Alternate screen (leaves your terminal clean on exit)
+- Supports Linux and macOS
 
 ## Installation
 
-### Using Homebrew
+### Homebrew (macOS / Linux)
 
 ```bash
 brew install tun43p/tap/zat
 ```
 
-### From Source
+### From releases
 
-#### Download
+Download the latest binary from [Releases](https://github.com/tun43p/zat/releases), extract it, and add it to your `PATH`.
 
-Clone the repository:
+### From source
+
+Requires [Zig](https://ziglang.org/download/) 0.15.2+.
 
 ```bash
 git clone https://github.com/tun43p/zat.git
 cd zat
-```
-
-#### Build the project
-
-```bash
-zig build
-```
-
-The executable will be generated in `zig-out/bin/zat`.
-
-#### Build in optimized mode
-
-For an optimized (release) version:
-
-```bash
 zig build -Doptimize=ReleaseFast
 ```
 
-Available optimization options:
-
-- `Debug` (default) - No optimization, with debug symbols
-- `ReleaseSafe` - Optimized with safety checks
-- `ReleaseFast` - Optimized for speed
-- `ReleaseSmall` - Optimized for size
-
-## Usage
-
-### Basic Usage
-
-```bash
-zat [file]
-```
-
-### Run directly with zig build
-
-```bash
-zig build run -- [file]
-```
-
-Example:
-
-```bash
-zig build run -- src/main.zig
-```
-
-### Run the compiled executable
-
-```bash
-./zig-out/bin/zat [file]
-```
-
-Example:
-
-```bash
-./zig-out/bin/zat README.md
-```
-
-### Install globally (optional)
-
-To install the executable on your system:
+The binary will be at `zig-out/bin/zat`. Optionally install it globally:
 
 ```bash
 zig build install --prefix ~/.local
 ```
 
-Then add `~/.local/bin` to your PATH if not already done.
+## Usage
+
+```bash
+zat <file>
+```
 
 ## Keyboard Shortcuts
 
@@ -145,43 +72,18 @@ Then add `~/.local/bin` to your PATH if not already done.
 
 ### Search Mode
 
-| Key     | Action                               |
-| ------- | ------------------------------------ |
-| `/`     | Enter search mode                    |
-| `Enter` | Confirm search                       |
-| `Esc`   | Cancel search / Clear search results |
-| `n`     | Jump to next match                   |
-| `N`     | Jump to previous match               |
+| Key     | Action                        |
+| ------- | ----------------------------- |
+| `/`     | Enter search mode             |
+| `Enter` | Confirm search                |
+| `Esc`   | Cancel search / Clear results |
+| `n`     | Jump to next match            |
+| `N`     | Jump to previous match        |
 
-## Build Commands
+## Contributing
 
-- `zig build` - Build the project
-- `zig build run -- [file]` - Build and run the project with arguments
-- `zig build test` - Run tests
-- `zig build -Doptimize=ReleaseFast` - Build in optimized release mode
-
-## Dependencies
-
-The project uses the following dependencies:
-
-- **mime** - MIME type detection
-  - Repository: [andrewrk/mime](https://github.com/andrewrk/mime)
-  - Version: 4.0.0
-
-Dependencies are automatically managed by the Zig build system and will be downloaded on first build.
-
-## Testing
-
-To run tests:
-
-```bash
-zig build test
-```
-
-## Authors
-
-- **tun43p** - _Initial work_ - [tun43p](https://github.com/tun43p)
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+MIT - See [LICENSE](LICENSE) for details.
