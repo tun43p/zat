@@ -216,7 +216,7 @@ pub const Renderer = struct {
             }
 
             // Check for string
-            if (self.isStringDelim(syn, line[pos])) {
+            if (isStringDelim(syn, line[pos])) {
                 const delim = line[pos];
                 var end = pos + 1;
                 while (end < line.len) {
@@ -245,15 +245,15 @@ pub const Renderer = struct {
 
                 const is_at_boundary = (pos == 0 or !isWordChar(line[pos - 1])) and (end >= line.len or !isWordChar(line[end]));
 
-                if (is_at_boundary and self.isBuiltin(syn, word)) {
+                if (is_at_boundary and isBuiltin(syn, word)) {
                     try self.write(builtin_color);
                     try self.renderWithSearch(word, search);
                     try self.write(style.reset);
-                } else if (is_at_boundary and self.isKeyword(syn, word)) {
+                } else if (is_at_boundary and isKeyword(syn, word)) {
                     try self.write(keyword_color ++ style.bold);
                     try self.renderWithSearch(word, search);
                     try self.write(style.reset);
-                } else if (is_at_boundary and self.isType(syn, word)) {
+                } else if (is_at_boundary and isType(syn, word)) {
                     try self.write(type_color);
                     try self.renderWithSearch(word, search);
                     try self.write(style.reset);
@@ -295,22 +295,22 @@ pub const Renderer = struct {
         }
     }
 
-    fn isStringDelim(_: *Renderer, syn: syntax.SyntaxDef, c: u8) bool {
+    fn isStringDelim(syn: syntax.SyntaxDef, c: u8) bool {
         for (syn.string_delims) |d| {
             if (c == d) return true;
         }
         return false;
     }
 
-    fn isBuiltin(_: *Renderer, syn: syntax.SyntaxDef, word: []const u8) bool {
+    fn isBuiltin(syn: syntax.SyntaxDef, word: []const u8) bool {
         return syn.builtins.has(word);
     }
 
-    fn isKeyword(_: *Renderer, syn: syntax.SyntaxDef, word: []const u8) bool {
+    fn isKeyword(syn: syntax.SyntaxDef, word: []const u8) bool {
         return syn.keywords.has(word);
     }
 
-    fn isType(_: *Renderer, syn: syntax.SyntaxDef, word: []const u8) bool {
+    fn isType(syn: syntax.SyntaxDef, word: []const u8) bool {
         return syn.types.has(word);
     }
 
