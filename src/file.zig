@@ -4,7 +4,6 @@ const mime = @import("mime.zig");
 pub const File = struct {
     path: []const u8,
     name: []const u8,
-    encoding: []const u8,
     mime: []const u8,
     readable: bool,
     size: u64,
@@ -33,7 +32,6 @@ pub const File = struct {
             return File{
                 .path = file_path,
                 .name = file_name,
-                .encoding = "UTF-8",
                 .mime = mime_info.mime,
                 .readable = false,
                 .size = file_size,
@@ -56,7 +54,6 @@ pub const File = struct {
         return File{
             .path = file_path,
             .name = file_name,
-            .encoding = "UTF-8",
             .mime = mime_info.mime,
             .readable = true,
             .size = file_size,

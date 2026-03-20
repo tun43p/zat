@@ -74,13 +74,12 @@ pub const Renderer = struct {
         var size_buf: [32]u8 = undefined;
         const size_str = std.fmt.bufPrint(&size_buf, "{d} bytes", .{file.size}) catch "?";
 
-        // Fields: name, mime, lines, size, encoding — skip fields that would overflow
+        // Fields: name, mime, lines, size — skip fields that would overflow
         const fields = [_]struct { color: []const u8, text: []const u8 }{
             .{ .color = style.cyan ++ style.bold, .text = file.name },
             .{ .color = style.bright_blue, .text = file.mime },
             .{ .color = number_color, .text = lines_str },
             .{ .color = style.bright_cyan, .text = size_str },
-            .{ .color = style.bright_green, .text = file.encoding },
         };
 
         for (fields, 0..) |field, fi| {
