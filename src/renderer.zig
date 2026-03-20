@@ -42,14 +42,14 @@ pub const Renderer = struct {
         return if (self.width > gutter + 2) self.width - gutter - 2 else 0;
     }
 
-    pub fn render(self: *Renderer, lines: []const []const u8, scroll: usize, visible_lines: usize, file: File, message: []const u8, mode: Mode, search: []const u8) !void {
+    pub fn render(self: *Renderer, lines: []const []const u8, code_block_states: []const bool, scroll: usize, visible_lines: usize, file: File, message: []const u8, mode: Mode, search: []const u8) !void {
         // Cursor to top-left + clear screen
         try self.write("\x1b[H\x1b[2J");
 
         try self.renderTopLine();
         try self.renderHeader(scroll, file);
         try self.renderSeparator();
-        try self.renderLines(lines, scroll, visible_lines, search);
+        try self.renderLines(lines, code_block_states, scroll, visible_lines, search);
         try self.renderFooter(message, mode, search);
         try self.renderBottomLine();
         try self.flush();
@@ -105,16 +105,7 @@ pub const Renderer = struct {
         try self.write(style.reset ++ "\r\n");
     }
 
-    fn renderLines(self: *Renderer, lines: []const []const u8, scroll: usize, visible_lines: usize, search: []const u8) !void {
-        // Compute code block state from start of file to scroll position
-        var in_code_block = false;
-        for (0..scroll) |i| {
-            const trimmed = std.mem.trimLeft(u8, lines[i], " ");
-            if (trimmed.len >= 3 and std.mem.eql(u8, trimmed[0..3], "```")) {
-                in_code_block = !in_code_block;
-            }
-        }
-
+    fn renderLines(self: *Renderer, lines: []const []const u8, code_block_states: []const bool, scroll: usize, visible_lines: usize, search: []const u8) !void {
         const max_w = self.contentWidth();
         var visual_rows: usize = 0;
         var i = scroll;
@@ -123,7 +114,7 @@ pub const Renderer = struct {
 
             const trimmed_full = std.mem.trimLeft(u8, full_line, " ");
             const is_fence = trimmed_full.len >= 3 and std.mem.eql(u8, trimmed_full[0..3], "```");
-            if (is_fence) in_code_block = !in_code_block;
+            const in_code_block = if (i < code_block_states.len) code_block_states[i] else false;
 
             // Word-wrap: split line into chunks
             var start: usize = 0;
