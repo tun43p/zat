@@ -90,10 +90,14 @@ pub const Terminal = struct {
     }
 
     pub fn readEscapeSeq(self: *const Terminal) ?u8 {
-        var seq: [2]u8 = undefined;
-        const n = self.reader.read(&seq) catch return null;
-        if (n == 2 and seq[0] == '[') return seq[1];
-        return null;
+        var b1: [1]u8 = undefined;
+        const n1 = self.reader.read(&b1) catch return null;
+        if (n1 == 0 or b1[0] != '[') return null;
+
+        var b2: [1]u8 = undefined;
+        const n2 = self.reader.read(&b2) catch return null;
+        if (n2 == 0) return null;
+        return b2[0];
     }
 };
 
