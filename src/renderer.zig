@@ -312,24 +312,15 @@ pub const Renderer = struct {
     }
 
     fn isBuiltin(_: *Renderer, syn: syntax.SyntaxDef, word: []const u8) bool {
-        for (syn.builtins) |b| {
-            if (std.mem.eql(u8, word, b)) return true;
-        }
-        return false;
+        return syn.builtins.has(word);
     }
 
     fn isKeyword(_: *Renderer, syn: syntax.SyntaxDef, word: []const u8) bool {
-        for (syn.keywords) |kw| {
-            if (std.mem.eql(u8, word, kw)) return true;
-        }
-        return false;
+        return syn.keywords.has(word);
     }
 
     fn isType(_: *Renderer, syn: syntax.SyntaxDef, word: []const u8) bool {
-        for (syn.types) |t| {
-            if (std.mem.eql(u8, word, t)) return true;
-        }
-        return false;
+        return syn.types.has(word);
     }
 
     fn isWordChar(c: u8) bool {
