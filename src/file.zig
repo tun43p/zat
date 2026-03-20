@@ -4,12 +4,12 @@ const mime = @import("mime.zig");
 pub const File = struct {
     path: []const u8,
     name: []const u8,
-    encoding: []const u8,
     mime: []const u8,
     readable: bool,
     size: u64,
     line_count: usize,
     content: []const u8,
+    lines: []const []const u8,
 
     pub fn init(allocator: std.mem.Allocator, path: []const u8) !File {
         const file = try std.fs.cwd().openFile(path, .{});
@@ -32,33 +32,34 @@ pub const File = struct {
             return File{
                 .path = file_path,
                 .name = file_name,
-                .encoding = "UTF-8",
                 .mime = mime_info.mime,
                 .readable = false,
                 .size = file_size,
                 .line_count = 0,
                 .content = "",
+                .lines = &.{},
             };
         }
 
         const buffer = try allocator.alloc(u8, file_size);
         _ = try file.readAll(buffer);
 
-        var line_count: usize = 0;
+        var line_list: std.ArrayList([]const u8) = .empty;
         var it = std.mem.splitScalar(u8, buffer, '\n');
-        while (it.next()) |_| {
-            line_count += 1;
+        while (it.next()) |line| {
+            try line_list.append(allocator, line);
         }
+        const lines = try line_list.toOwnedSlice(allocator);
 
         return File{
             .path = file_path,
             .name = file_name,
-            .encoding = "UTF-8",
             .mime = mime_info.mime,
             .readable = true,
             .size = file_size,
-            .line_count = line_count,
+            .line_count = lines.len,
             .content = buffer,
+            .lines = lines,
         };
     }
 };

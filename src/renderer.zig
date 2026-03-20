@@ -42,14 +42,14 @@ pub const Renderer = struct {
         return if (self.width > gutter + 2) self.width - gutter - 2 else 0;
     }
 
-    pub fn render(self: *Renderer, lines: []const []const u8, scroll: usize, visible_lines: usize, file: File, message: []const u8, mode: Mode, search: []const u8) !void {
+    pub fn render(self: *Renderer, lines: []const []const u8, code_block_states: []const bool, scroll: usize, visible_lines: usize, file: File, message: []const u8, mode: Mode, search: []const u8) !void {
         // Cursor to top-left + clear screen
         try self.write("\x1b[H\x1b[2J");
 
         try self.renderTopLine();
         try self.renderHeader(scroll, file);
         try self.renderSeparator();
-        try self.renderLines(lines, scroll, visible_lines, search);
+        try self.renderLines(lines, code_block_states, scroll, visible_lines, search);
         try self.renderFooter(message, mode, search);
         try self.renderBottomLine();
         try self.flush();
@@ -74,13 +74,12 @@ pub const Renderer = struct {
         var size_buf: [32]u8 = undefined;
         const size_str = std.fmt.bufPrint(&size_buf, "{d} bytes", .{file.size}) catch "?";
 
-        // Fields: name, mime, lines, size, encoding — skip fields that would overflow
+        // Fields: name, mime, lines, size — skip fields that would overflow
         const fields = [_]struct { color: []const u8, text: []const u8 }{
             .{ .color = style.cyan ++ style.bold, .text = file.name },
             .{ .color = style.bright_blue, .text = file.mime },
             .{ .color = number_color, .text = lines_str },
             .{ .color = style.bright_cyan, .text = size_str },
-            .{ .color = style.bright_green, .text = file.encoding },
         };
 
         for (fields, 0..) |field, fi| {
@@ -105,16 +104,7 @@ pub const Renderer = struct {
         try self.write(style.reset ++ "\r\n");
     }
 
-    fn renderLines(self: *Renderer, lines: []const []const u8, scroll: usize, visible_lines: usize, search: []const u8) !void {
-        // Compute code block state from start of file to scroll position
-        var in_code_block = false;
-        for (0..scroll) |i| {
-            const trimmed = std.mem.trimLeft(u8, lines[i], " ");
-            if (trimmed.len >= 3 and std.mem.eql(u8, trimmed[0..3], "```")) {
-                in_code_block = !in_code_block;
-            }
-        }
-
+    fn renderLines(self: *Renderer, lines: []const []const u8, code_block_states: []const bool, scroll: usize, visible_lines: usize, search: []const u8) !void {
         const max_w = self.contentWidth();
         var visual_rows: usize = 0;
         var i = scroll;
@@ -123,7 +113,7 @@ pub const Renderer = struct {
 
             const trimmed_full = std.mem.trimLeft(u8, full_line, " ");
             const is_fence = trimmed_full.len >= 3 and std.mem.eql(u8, trimmed_full[0..3], "```");
-            if (is_fence) in_code_block = !in_code_block;
+            const in_code_block = if (i < code_block_states.len) code_block_states[i] else false;
 
             // Word-wrap: split line into chunks
             var start: usize = 0;
@@ -225,7 +215,7 @@ pub const Renderer = struct {
             }
 
             // Check for string
-            if (self.isStringDelim(syn, line[pos])) {
+            if (isStringDelim(syn, line[pos])) {
                 const delim = line[pos];
                 var end = pos + 1;
                 while (end < line.len) {
@@ -254,15 +244,15 @@ pub const Renderer = struct {
 
                 const is_at_boundary = (pos == 0 or !isWordChar(line[pos - 1])) and (end >= line.len or !isWordChar(line[end]));
 
-                if (is_at_boundary and self.isBuiltin(syn, word)) {
+                if (is_at_boundary and isBuiltin(syn, word)) {
                     try self.write(builtin_color);
                     try self.renderWithSearch(word, search);
                     try self.write(style.reset);
-                } else if (is_at_boundary and self.isKeyword(syn, word)) {
+                } else if (is_at_boundary and isKeyword(syn, word)) {
                     try self.write(keyword_color ++ style.bold);
                     try self.renderWithSearch(word, search);
                     try self.write(style.reset);
-                } else if (is_at_boundary and self.isType(syn, word)) {
+                } else if (is_at_boundary and isType(syn, word)) {
                     try self.write(type_color);
                     try self.renderWithSearch(word, search);
                     try self.write(style.reset);
@@ -304,22 +294,22 @@ pub const Renderer = struct {
         }
     }
 
-    fn isStringDelim(_: *Renderer, syn: syntax.SyntaxDef, c: u8) bool {
+    fn isStringDelim(syn: syntax.SyntaxDef, c: u8) bool {
         for (syn.string_delims) |d| {
             if (c == d) return true;
         }
         return false;
     }
 
-    fn isBuiltin(_: *Renderer, syn: syntax.SyntaxDef, word: []const u8) bool {
+    fn isBuiltin(syn: syntax.SyntaxDef, word: []const u8) bool {
         return syn.builtins.has(word);
     }
 
-    fn isKeyword(_: *Renderer, syn: syntax.SyntaxDef, word: []const u8) bool {
+    fn isKeyword(syn: syntax.SyntaxDef, word: []const u8) bool {
         return syn.keywords.has(word);
     }
 
-    fn isType(_: *Renderer, syn: syntax.SyntaxDef, word: []const u8) bool {
+    fn isType(syn: syntax.SyntaxDef, word: []const u8) bool {
         return syn.types.has(word);
     }
 
