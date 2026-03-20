@@ -8,6 +8,7 @@ const TerminalSize = @import("terminal.zig").TerminalSize;
 
 pub const App = struct {
     lines: []const []const u8,
+    code_block_states: []const bool,
     file: File,
     term: Terminal,
     renderer: Renderer,
@@ -26,14 +27,20 @@ pub const App = struct {
         const term_size = try TerminalSize.get(term.stdout) orelse return error.TerminalSizeNotFound;
         const visible_lines: usize = if (term_size.height > 6) term_size.height - 6 else 1;
 
-        var line_list: std.ArrayList([]const u8) = .empty;
-        var it = std.mem.splitScalar(u8, file.content, '\n');
-        while (it.next()) |line| {
-            try line_list.append(allocator, line);
+        // Precompute code block state for each line (for markdown rendering)
+        var cb_states: std.ArrayList(bool) = .empty;
+        var in_code_block = false;
+        for (file.lines) |line| {
+            const trimmed = std.mem.trimLeft(u8, line, " ");
+            if (trimmed.len >= 3 and std.mem.eql(u8, trimmed[0..3], "```")) {
+                in_code_block = !in_code_block;
+            }
+            try cb_states.append(allocator, in_code_block);
         }
 
         return .{
-            .lines = line_list.items,
+            .lines = file.lines,
+            .code_block_states = try cb_states.toOwnedSlice(allocator),
             .file = file,
             .term = term,
             .renderer = Renderer.init(writer, term_size.width, term_size.height, file.mime),
@@ -242,6 +249,6 @@ pub const App = struct {
     }
 
     fn render(self: *App) !void {
-        try self.renderer.render(self.lines, self.scroll, self.visible_lines, self.file, self.message, self.mode, self.search_term);
+        try self.renderer.render(self.lines, self.code_block_states, self.scroll, self.visible_lines, self.file, self.message, self.mode, self.search_term);
     }
 };
