@@ -39,7 +39,7 @@ pub const Renderer = struct {
     }
 
     fn contentWidth(self: *Renderer) usize {
-        return if (self.width > gutter + 1) self.width - gutter - 1 else 0;
+        return if (self.width > gutter + 2) self.width - gutter - 2 else 0;
     }
 
     pub fn render(self: *Renderer, lines: []const []const u8, scroll: usize, visible_lines: usize, file: File, message: []const u8, mode: Mode, search: []const u8) !void {
@@ -67,35 +67,33 @@ pub const Renderer = struct {
         try self.write(table_color);
         for (0..gutter) |_| try self.write(" ");
         try self.write(chars.pipe ++ " ");
+        var col: usize = gutter + 2;
 
-        // File name
-        try self.write(style.cyan ++ style.bold);
-        try self.write(file.name);
-        try self.write(style.reset);
-
-        // File mime
-        try self.write(table_color ++ " " ++ chars.pipe ++ " ");
-        try self.write(style.bright_blue);
-        try self.write(file.mime);
-
-        // File lines
-        try self.write(table_color ++ " " ++ chars.pipe ++ " ");
-        try self.write(number_color);
         var lines_buf: [32]u8 = undefined;
         const lines_str = std.fmt.bufPrint(&lines_buf, "{d}/{d} lines", .{ scroll + 1, file.line_count }) catch "?";
-        try self.write(lines_str);
-
-        // File size
-        try self.write(table_color ++ " " ++ chars.pipe ++ " ");
-        try self.write(style.bright_cyan);
         var size_buf: [32]u8 = undefined;
         const size_str = std.fmt.bufPrint(&size_buf, "{d} bytes", .{file.size}) catch "?";
-        try self.write(size_str);
 
-        // File encoding
-        try self.write(table_color ++ " " ++ chars.pipe ++ " ");
-        try self.write(style.bright_green);
-        try self.write(file.encoding);
+        // Fields: name, mime, lines, size, encoding — skip fields that would overflow
+        const fields = [_]struct { color: []const u8, text: []const u8 }{
+            .{ .color = style.cyan ++ style.bold, .text = file.name },
+            .{ .color = style.bright_blue, .text = file.mime },
+            .{ .color = number_color, .text = lines_str },
+            .{ .color = style.bright_cyan, .text = size_str },
+            .{ .color = style.bright_green, .text = file.encoding },
+        };
+
+        for (fields, 0..) |field, fi| {
+            const sep_len: usize = if (fi > 0) 3 else 0; // " │ "
+            const needed = sep_len + field.text.len;
+            if (col + needed > self.width) break;
+            if (fi > 0) try self.write(table_color ++ " " ++ chars.pipe ++ " ");
+            try self.write(field.color);
+            try self.write(field.text);
+            try self.write(style.reset);
+            col += needed;
+        }
+
         try self.write(style.reset ++ "\r\n");
     }
 
@@ -108,8 +106,6 @@ pub const Renderer = struct {
     }
 
     fn renderLines(self: *Renderer, lines: []const []const u8, scroll: usize, visible_lines: usize, search: []const u8) !void {
-        const end = @min(scroll + visible_lines, lines.len);
-
         // Compute code block state from start of file to scroll position
         var in_code_block = false;
         for (0..scroll) |i| {
@@ -119,35 +115,80 @@ pub const Renderer = struct {
             }
         }
 
-        for (scroll..end) |i| {
-            var num_buf: [32]u8 = undefined;
-            const num = std.fmt.bufPrint(&num_buf, number_color ++ "{d: >4} " ++ table_color ++ chars.pipe ++ " " ++ style.reset, .{i + 1}) catch continue;
-            try self.write(num);
+        const max_w = self.contentWidth();
+        var visual_rows: usize = 0;
+        var i = scroll;
+        while (i < lines.len and visual_rows < visible_lines) {
+            const full_line = lines[i];
 
-            const trimmed = std.mem.trimLeft(u8, lines[i], " ");
-            const is_fence = trimmed.len >= 3 and std.mem.eql(u8, trimmed[0..3], "```");
+            const trimmed_full = std.mem.trimLeft(u8, full_line, " ");
+            const is_fence = trimmed_full.len >= 3 and std.mem.eql(u8, trimmed_full[0..3], "```");
+            if (is_fence) in_code_block = !in_code_block;
 
-            if (is_fence) {
-                // The fence line itself is green
-                try self.write(string_color);
-                try self.renderWithSearch(lines[i], search);
-                try self.write(style.reset);
-                in_code_block = !in_code_block;
-            } else if (in_code_block) {
-                // Inside code block: all green
-                try self.write(string_color);
-                try self.renderWithSearch(lines[i], search);
-                try self.write(style.reset);
-            } else {
-                try self.renderLineWithHighlight(lines[i], search);
+            // Word-wrap: split line into chunks
+            var start: usize = 0;
+            var is_first_chunk = true;
+            while (start < full_line.len and visual_rows < visible_lines) {
+                var end = @min(start + max_w, full_line.len);
+                if (end < full_line.len) {
+                    // Look back for a space to break at
+                    var break_at = end;
+                    while (break_at > start and full_line[break_at] != ' ') break_at -= 1;
+                    if (break_at > start) {
+                        end = break_at + 1; // include the space, wrap after it
+                    }
+                }
+                const chunk = full_line[start..end];
+
+                // Render gutter
+                if (is_first_chunk) {
+                    var num_buf: [32]u8 = undefined;
+                    const num = std.fmt.bufPrint(&num_buf, number_color ++ "{d: >4} " ++ table_color ++ chars.pipe ++ " " ++ style.reset, .{i + 1}) catch break;
+                    try self.write(num);
+                    is_first_chunk = false;
+                } else {
+                    try self.write(table_color);
+                    for (0..gutter) |_| try self.write(" ");
+                    try self.write(chars.pipe ++ " " ++ style.reset);
+                }
+
+                // Render chunk content with highlighting
+                if (is_fence or in_code_block) {
+                    try self.write(string_color);
+                    try self.renderWithSearch(chunk, search);
+                    try self.write(style.reset);
+                } else {
+                    try self.renderLineWithHighlight(chunk, search);
+                }
+                try self.write("\r\n");
+                visual_rows += 1;
+                start = end;
             }
-            try self.write("\r\n");
+
+            // Short lines that fit entirely
+            if (is_first_chunk and visual_rows < visible_lines) {
+                var num_buf: [32]u8 = undefined;
+                const num = std.fmt.bufPrint(&num_buf, number_color ++ "{d: >4} " ++ table_color ++ chars.pipe ++ " " ++ style.reset, .{i + 1}) catch {
+                    i += 1;
+                    continue;
+                };
+                try self.write(num);
+                if (is_fence or in_code_block) {
+                    try self.write(string_color);
+                    try self.renderWithSearch(full_line, search);
+                    try self.write(style.reset);
+                } else {
+                    try self.renderLineWithHighlight(full_line, search);
+                }
+                try self.write("\r\n");
+                visual_rows += 1;
+            }
+            i += 1;
         }
 
         // Fill remaining empty lines with gutter
-        const rendered = end - scroll;
-        if (rendered < visible_lines) {
-            for (0..visible_lines - rendered) |_| {
+        if (visual_rows < visible_lines) {
+            for (0..visible_lines - visual_rows) |_| {
                 try self.write(table_color);
                 for (0..gutter) |_| try self.write(" ");
                 try self.write(chars.pipe ++ style.reset ++ "\r\n");
@@ -320,18 +361,25 @@ pub const Renderer = struct {
         try self.write(table_color);
         for (0..gutter) |_| try self.write(" ");
         try self.write(chars.pipe ++ " ");
+        const max_footer = self.contentWidth();
         if (message.len > 0) {
+            const msg = if (message.len > max_footer) message[0..max_footer] else message;
             try self.write(style.gray);
-            try self.write(message);
+            try self.write(msg);
             try self.write(style.reset);
         } else if (search.len > 0) {
             try self.write(style.gray ++ "Search: " ++ style.reset);
             try self.write(style.bg_yellow ++ style.black);
-            try self.write(search);
+            const max_search = if (max_footer > 8) max_footer - 8 else 0;
+            const s = if (search.len > max_search) search[0..max_search] else search;
+            try self.write(s);
             try self.write(style.reset);
-            try self.write(style.gray ++ " (press Esc to clear, n/N to navigate)" ++ style.reset);
         } else if (mode == .normal) {
-            try self.write(style.gray ++ "Press : to enter COMMAND mode or / to enter SEARCH mode" ++ style.reset);
+            const hint = "Press : for COMMAND or / for SEARCH mode";
+            const h = if (hint.len > max_footer) hint[0..max_footer] else hint;
+            try self.write(style.gray);
+            try self.write(h);
+            try self.write(style.reset);
         }
         try self.write("\r\n");
     }
