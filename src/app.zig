@@ -246,6 +246,7 @@ pub const App = struct {
                 self.scroll = if (self.scroll > half) self.scroll - half else 0;
                 try self.render();
             },
+            'q' => return true,
             ' ' => {
                 // Scroll down by one full page.
                 const max_scroll = if (self.lines.len > self.visible_lines) self.lines.len - self.visible_lines else 0;
