@@ -111,6 +111,13 @@ const builtin_color = style.bright_blue;
 /// from scratch. This simplifies the code and avoids synchronization
 /// issues, at the cost of redrawing everything on each keypress (which
 /// is fast enough for text files).
+fn toLowerBuf(buf: []u8, input: []const u8) []const u8 {
+    const len = @min(buf.len, input.len);
+    for (0..len) |i| {
+        buf[i] = std.ascii.toLower(input[i]);
+    }
+    return buf[0..len];
+}
 pub const Renderer = struct {
     /// The buffered writer that receives all ANSI output. Writes are
     /// accumulated in a buffer and sent to the terminal in one `flush`
@@ -513,7 +520,11 @@ pub const Renderer = struct {
         // Scan through the text looking for search matches.
         var pos: usize = 0;
         while (pos < text.len) {
-            if (std.mem.indexOf(u8, text[pos..], search)) |match| {
+            var text_lower_buf: [4096]u8 = undefined;
+            var search_lower_buf: [256]u8 = undefined;
+            const text_lower = toLowerBuf(&text_lower_buf, text[pos..]);
+            const search_lower = toLowerBuf(&search_lower_buf, search);
+            if (std.mem.indexOf(u8, text_lower, search_lower)) |match| {
                 // Write the text before the match.
                 try self.write(text[pos .. pos + match]);
                 // Write the match with yellow background + black text.

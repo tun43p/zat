@@ -43,6 +43,14 @@ const Renderer = @import("renderer.zig").Renderer;
 const Terminal = @import("terminal.zig").Terminal;
 const TerminalSize = @import("terminal.zig").TerminalSize;
 
+fn toLower(buf: []const u8, input: []const u8) []const u8 {
+    const len = @min(buf.len, input.len);
+    for (0..len) |i| {
+        buf[i] = std.ascii.toLower(input[i]);
+    }
+    return buf[0..len];
+}
+
 /// The main application struct. Manages state and drives the event loop.
 pub const App = struct {
     /// All lines of the loaded file (shared reference, not owned).
@@ -238,6 +246,7 @@ pub const App = struct {
                 self.scroll = if (self.scroll > half) self.scroll - half else 0;
                 try self.render();
             },
+            'q' => return true,
             ' ' => {
                 // Scroll down by one full page.
                 const max_scroll = if (self.lines.len > self.visible_lines) self.lines.len - self.visible_lines else 0;
@@ -251,7 +260,11 @@ pub const App = struct {
                 if (self.search_term.len > 0) {
                     var i = self.scroll + 1;
                     while (i < self.lines.len) : (i += 1) {
-                        if (std.mem.indexOf(u8, self.lines[i], self.search_term) != null) {
+                        var line_lower_buf: [4096]u8 = undefined;
+                        var search_lower_buf: [256]u8 = undefined;
+                        const line_lower = toLower(&line_lower_buf, self.lines[i]);
+                        const search_lower = toLower(&search_lower_buf, self.search_term);
+                        if (std.mem.indexOf(u8, line_lower, search_lower) != null) {
                             // Position the matched line at the top of the screen,
                             // but don't scroll past the end.
                             self.scroll = if (i + self.visible_lines <= self.lines.len) i else self.lines.len - self.visible_lines;
@@ -266,7 +279,11 @@ pub const App = struct {
                 if (self.search_term.len > 0 and self.scroll > 0) {
                     var i = self.scroll - 1;
                     while (true) {
-                        if (std.mem.indexOf(u8, self.lines[i], self.search_term) != null) {
+                        var line_lower_buf: [4096]u8 = undefined;
+                        var search_lower_buf: [4096]u8 = undefined;
+                        const line_lower = toLower(&line_lower_buf, self.lines[i]);
+                        const search_lower = toLower(&search_lower_buf, self.search_term);
+                        if (std.mem.indexOf(u8, line_lower, search_lower) != null) {
                             self.scroll = i;
                             break;
                         }
