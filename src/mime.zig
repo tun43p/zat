@@ -1,11 +1,63 @@
+//! MIME type detection based on file extensions and special filenames.
+//!
+//! Zat needs to know the MIME type of a file for two reasons:
+//!
+//! 1. **Syntax highlighting** — the `syntax` module maps MIME types to
+//!    language-specific keyword/type definitions (e.g. `"text/x-zig"` →
+//!    Zig keywords). See `syntax.zig` for details.
+//! 2. **Binary detection** — files with non-text MIME types (images,
+//!    archives, etc.) are flagged as non-readable so Zat can refuse to
+//!    display them instead of showing garbage.
+//!
+//! ## How detection works
+//!
+//! Detection is purely based on the filename/extension — we do **not**
+//! inspect file content (no magic bytes). The lookup order is:
+//!
+//! 1. If the file has no extension, try matching the full filename
+//!    (e.g. `Makefile`, `Dockerfile`, `.bashrc`) via `fromFilename`.
+//! 2. Otherwise, match the extension (e.g. `.zig`, `.py`) via `fromExtension`.
+//! 3. If nothing matches, default to `"text/plain"` (assumed readable).
+//!
+//! Both lookup functions use `inline for` over compile-time tuples, which
+//! the compiler unrolls into a fast sequence of comparisons.
+
 const std = @import("std");
 
+/// Holds the result of a MIME type lookup.
 pub const MimeInfo = struct {
+    /// The MIME type string (e.g. "text/x-zig", "image/png").
     mime: []const u8,
+    /// Whether the file can be displayed as text. Binary formats
+    /// (images, audio, video, archives, fonts, etc.) have this set to `false`.
     readable: bool,
 };
 
+/// Detects the MIME type from a file extension (including the leading dot).
+///
+/// Covers 100+ extensions across these categories:
+/// - **Web**: `.html`, `.css`, `.js`, `.ts`, `.tsx`, `.jsx`, `.vue`, `.svelte`, `.astro`
+/// - **Data/Config**: `.json`, `.yaml`, `.toml`, `.ini`, `.env`, `.csv`, `.graphql`, `.proto`
+/// - **Markdown/Docs**: `.md`, `.mdx`, `.rst`, `.tex`, `.txt`
+/// - **Shell/Scripts**: `.sh`, `.bash`, `.zsh`, `.fish`, `.nu`, `.ps1`, `.bat`
+/// - **Systems**: `.zig`, `.c`, `.h`, `.cpp`, `.rs`, `.go`, `.asm`, `.nim`, `.v`, `.odin`
+/// - **JVM**: `.java`, `.kt`, `.scala`, `.groovy`, `.clj`
+/// - **.NET**: `.cs`, `.fs`, `.vb`
+/// - **Scripting**: `.py`, `.rb`, `.php`, `.pl`, `.lua`, `.r`, `.jl`, `.ex`, `.erl`
+/// - **Functional**: `.hs`, `.ml`, `.elm`, `.rkt`, `.lisp`
+/// - **Apple/Mobile**: `.swift`, `.m`, `.dart`
+/// - **Binary**: images, audio, video, archives, documents, fonts, wasm
+///
+/// Returns `{ .mime = "text/plain", .readable = true }` for unknown extensions.
+///
+/// ## Parameters
+///
+/// - `ext`: The file extension **with** the leading dot (e.g. `".zig"`).
+///          An empty string is allowed and will match the default.
 pub fn fromExtension(ext: []const u8) MimeInfo {
+    // Each entry is a tuple of (extension, MIME type, is_readable).
+    // `inline for` unrolls this at compile time into a chain of comparisons,
+    // so there is no runtime loop overhead.
     const map = .{
         // Web
         .{ ".html", "text/html", true },
@@ -125,7 +177,7 @@ pub fn fromExtension(ext: []const u8) MimeInfo {
         // Database
         .{ ".sql", "text/x-sql", true },
 
-        // Misc
+        // Misc text
         .{ ".diff", "text/x-diff", true },
         .{ ".patch", "text/x-diff", true },
         .{ ".log", "text/x-log", true },
@@ -133,29 +185,29 @@ pub fn fromExtension(ext: []const u8) MimeInfo {
         .{ ".gitignore", "text/plain", true },
         .{ ".editorconfig", "text/plain", true },
 
-        // Images
+        // Images (binary — not readable)
         .{ ".png", "image/png", false },
         .{ ".jpg", "image/jpeg", false },
         .{ ".jpeg", "image/jpeg", false },
         .{ ".gif", "image/gif", false },
-        .{ ".svg", "image/svg+xml", true },
+        .{ ".svg", "image/svg+xml", true }, // SVG is XML-based text
         .{ ".webp", "image/webp", false },
         .{ ".ico", "image/x-icon", false },
         .{ ".bmp", "image/bmp", false },
 
-        // Audio
+        // Audio (binary)
         .{ ".mp3", "audio/mpeg", false },
         .{ ".wav", "audio/wav", false },
         .{ ".ogg", "audio/ogg", false },
         .{ ".flac", "audio/flac", false },
 
-        // Video
+        // Video (binary)
         .{ ".mp4", "video/mp4", false },
         .{ ".webm", "video/webm", false },
         .{ ".avi", "video/x-msvideo", false },
         .{ ".mkv", "video/x-matroska", false },
 
-        // Archives
+        // Archives (binary)
         .{ ".zip", "application/zip", false },
         .{ ".tar", "application/x-tar", false },
         .{ ".gz", "application/gzip", false },
@@ -164,7 +216,7 @@ pub fn fromExtension(ext: []const u8) MimeInfo {
         .{ ".7z", "application/x-7z-compressed", false },
         .{ ".rar", "application/x-rar-compressed", false },
 
-        // Documents
+        // Documents (binary)
         .{ ".pdf", "application/pdf", false },
         .{ ".doc", "application/msword", false },
         .{ ".docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", false },
@@ -172,41 +224,61 @@ pub fn fromExtension(ext: []const u8) MimeInfo {
         .{ ".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", false },
         .{ ".ppt", "application/vnd.ms-powerpoint", false },
 
-        // Fonts
+        // Fonts (binary)
         .{ ".woff", "font/woff", false },
         .{ ".woff2", "font/woff2", false },
         .{ ".ttf", "font/ttf", false },
         .{ ".otf", "font/otf", false },
 
-        // Wasm
+        // WebAssembly
         .{ ".wasm", "application/wasm", false },
-        .{ ".wat", "text/x-wat", true },
+        .{ ".wat", "text/x-wat", true }, // WAT is the text format of Wasm
     };
 
     inline for (map) |entry| {
         if (std.mem.eql(u8, ext, entry[0])) return .{ .mime = entry[1], .readable = entry[2] };
     }
 
+    // Unknown extensions are treated as plain text by default.
     return .{ .mime = "text/plain", .readable = true };
 }
 
+/// Detects the MIME type from a special filename (files without extensions
+/// or with well-known names).
+///
+/// This handles files like `Makefile`, `Dockerfile`, `.bashrc`, `.gitconfig`,
+/// etc. that are identified by their exact name rather than their extension.
+///
+/// Returns `null` if the filename is not recognized, in which case the
+/// caller should fall back to `fromExtension`.
+///
+/// ## Parameters
+///
+/// - `name`: The basename of the file (e.g. `"Makefile"`, `".bashrc"`).
 pub fn fromFilename(name: []const u8) ?MimeInfo {
     const name_map = .{
+        // Build tools
         .{ "Makefile", "text/x-shellscript" },
         .{ "Dockerfile", "text/x-shellscript" },
+        .{ "Justfile", "text/x-shellscript" },
+        .{ "CMakeLists.txt", "text/x-shellscript" },
+
+        // Ruby ecosystem
         .{ "Vagrantfile", "text/x-ruby" },
         .{ "Rakefile", "text/x-ruby" },
         .{ "Gemfile", "text/x-ruby" },
-        .{ "Justfile", "text/x-shellscript" },
-        .{ "CMakeLists.txt", "text/x-shellscript" },
+
+        // Shell config files (dotfiles)
         .{ ".bashrc", "text/x-shellscript" },
         .{ ".zshrc", "text/x-shellscript" },
         .{ ".profile", "text/x-shellscript" },
         .{ ".bash_profile", "text/x-shellscript" },
+        .{ ".env", "text/x-shellscript" },
+
+        // Config files
         .{ ".gitignore", "text/plain" },
         .{ ".gitconfig", "text/toml" },
         .{ ".editorconfig", "text/toml" },
-        .{ ".env", "text/x-shellscript" },
     };
 
     inline for (name_map) |entry| {

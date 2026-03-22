@@ -1,3 +1,5 @@
+{{< /*<!-- markdownlint-disable MD033 -->*/}}
+
 # Zat
 
 What `cat` would be if it went to the gym, thanks to Zig.
@@ -90,6 +92,12 @@ zat <file>
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
+## Contributors
+
+<a href="https://github.com/tun43p/zat/graphs/contributors">
+<img src="https://contrib.rocks/image?repo=tun43p/zat" alt="Contributors" />
+</a>
+
 ## License
 
-MIT - See [LICENSE](LICENSE) for details.
+This project is licensed under the MIT License, see the [LICENSE](../LICENSE) file for details.
